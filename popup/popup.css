@@ -1956,3 +1956,280 @@ mark.rs-kw {
     width: 100%;
   }
 }
+
+/* ══════════════════════════════════════
+   Resume Align Screen
+══════════════════════════════════════ */
+
+/* Two-column body */
+.rsalign-body {
+  display: flex;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  overflow-y: auto;
+  align-items: flex-start;
+}
+
+.rsalign-left {
+  flex: 0 0 46%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.rsalign-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.rsalign-col-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-dark);
+  margin-bottom: var(--space-xs);
+}
+
+/* Section rows */
+.rsalign-section-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-sm);
+  background: var(--color-white);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: relative;
+}
+
+.rsalign-section-row input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.rsalign-check-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--color-gray);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-white);
+}
+
+.rsalign-section-row input:checked ~ .rsalign-check-box {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.rsalign-section-row input:checked ~ .rsalign-check-box::after {
+  content: "";
+  display: block;
+  width: 5px;
+  height: 9px;
+  border: 2px solid var(--color-dark);
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.rsalign-section-label {
+  flex: 1;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-dark);
+}
+
+.rsalign-help {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+/* Work experience sub-options */
+.rsalign-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 36px;
+  margin-top: -2px;
+}
+
+.rsalign-sub.hidden {
+  display: none;
+}
+
+.rsalign-radio-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  cursor: pointer;
+  padding: 4px 0;
+  position: relative;
+}
+
+.rsalign-radio-row input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.rsalign-radio-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--color-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+  position: relative;
+  background: var(--color-white);
+}
+
+.rsalign-radio-row input:checked ~ .rsalign-radio-dot {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.rsalign-radio-dot::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-dark);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+
+.rsalign-radio-row input:checked ~ .rsalign-radio-dot::after {
+  opacity: 1;
+}
+
+.rsalign-radio-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.rsalign-radio-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-dark);
+}
+
+.rsalign-radio-desc {
+  font-size: 11px;
+  color: var(--color-muted);
+}
+
+/* Keyword section */
+.rsalign-kw-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.rsalign-kw-count {
+  font-weight: var(--font-weight-regular);
+  color: var(--color-muted);
+}
+
+.rsalign-select-all {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.rsalign-kw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.rsalign-kw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-gray);
+  background: var(--color-white);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  color: var(--color-dark);
+}
+
+.rsalign-kw-chip.selected {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.rsalign-kw-chip-check {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid var(--color-muted);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.rsalign-kw-chip.selected .rsalign-kw-chip-check {
+  border-color: var(--color-dark);
+  background: var(--color-dark);
+}
+
+.rsalign-kw-chip.selected .rsalign-kw-chip-check::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  width: 4px;
+  height: 7px;
+  border: 1.5px solid var(--color-primary);
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+
+/* Custom keyword input row */
+.rsalign-kw-add-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-gray);
+  background: var(--color-white);
+}
+
+.rsalign-kw-input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: var(--font-size-sm);
+  color: var(--color-dark);
+  outline: none;
+  font-family: var(--font-family);
+}
+
+.rsalign-kw-input::placeholder {
+  color: var(--color-muted);
+}
+
+.rsalign-kw-help-icon {
+  color: var(--color-muted);
+  font-size: 12px;
+}

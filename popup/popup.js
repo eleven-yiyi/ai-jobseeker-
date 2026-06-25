@@ -7,13 +7,19 @@ let currentJob     = null;   // { company, title, jd }
 let currentCacheKey = null;
 let parsedProfile  = null;   // temp storage during onboarding confirm
 
+const resumeOptions = {
+  sections: ['summary', 'skills', 'work_experience', 'projects'],
+  workExpMode: 'quick',
+  keywords: [],
+};
+
 // ─────────────────────────────────────────────
 // Screen management
 // ─────────────────────────────────────────────
 const ALL_SCREENS = [
   'onboarding', 'parsing', 'confirm',
   'home', 'no-job', 'analyzing', 'results', 'limit', 'settings',
-  'resume-diff', 'resume-loading', 'resume-view'
+  'resume-diff', 'resume-align', 'resume-loading', 'resume-view'
 ];
 
 function showScreen(name) {
@@ -209,7 +215,13 @@ function bindStaticListeners() {
   document.getElementById('btn-resume-diff-back').addEventListener('click', () => showScreen('results'));
 
   // ── Resume: loading back ──
-  document.getElementById('btn-resume-loading-back').addEventListener('click', () => showScreen('resume-diff'));
+  document.getElementById('btn-resume-loading-back').addEventListener('click', () => showScreen('resume-align'));
+
+  // ── Resume: align back ──
+  document.getElementById('btn-resume-align-back').addEventListener('click', () => showScreen('resume-diff'));
+
+  // ── Resume: align next → generate ──
+  document.getElementById('btn-resume-align-next').addEventListener('click', startResumeGeneration);
 
   // ── Resume: view back ──
   document.getElementById('btn-resume-view-back').addEventListener('click', () => {
@@ -218,7 +230,7 @@ function bindStaticListeners() {
   });
 
   // ── Resume: generate ──
-  document.getElementById('btn-resume-generate').addEventListener('click', startResumeGeneration);
+  document.getElementById('btn-resume-generate').addEventListener('click', initResumeAlign);
 
   // ── Resume: download ──
   document.getElementById('btn-resume-download').addEventListener('click', downloadResumePdf);
@@ -807,6 +819,115 @@ async function initResumeDiff() {
   }
 }
 
+async function initResumeAlign() {
+  const { cache = {} } = await load('cache');
+  const cached = cache[currentCacheKey];
+  if (!cached) return;
+
+  // Reset keyword selection
+  resumeOptions.keywords = [];
+
+  const missing = (cached.matches || []).filter(m => m.status === 'missing');
+  const chipsEl = document.getElementById('rsalign-kw-chips');
+  chipsEl.innerHTML = '';
+
+  missing.forEach(m => {
+    const chip = document.createElement('button');
+    chip.className = 'rsalign-kw-chip';
+    chip.dataset.keyword = m.skill;
+    chip.type = 'button';
+    chip.innerHTML = `<span class="rsalign-kw-chip-check"></span><span>${m.skill}</span>`;
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('selected');
+      if (chip.classList.contains('selected')) {
+        resumeOptions.keywords.push(m.skill);
+      } else {
+        resumeOptions.keywords = resumeOptions.keywords.filter(k => k !== m.skill);
+      }
+      updateKwCount(missing.length);
+    });
+    chipsEl.appendChild(chip);
+  });
+
+  updateKwCount(missing.length);
+
+  // Section checkboxes → update resumeOptions.sections
+  document.querySelectorAll('.rsalign-check').forEach(cb => {
+    cb.checked = resumeOptions.sections.includes(cb.value);
+    cb.onchange = () => {
+      if (cb.checked) {
+        if (!resumeOptions.sections.includes(cb.value)) resumeOptions.sections.push(cb.value);
+      } else {
+        resumeOptions.sections = resumeOptions.sections.filter(s => s !== cb.value);
+      }
+      // Show/hide work experience sub-options
+      if (cb.value === 'work_experience') {
+        document.getElementById('rsalign-work-sub').classList.toggle('hidden', !cb.checked);
+      }
+    };
+  });
+
+  // Work experience mode radios
+  document.querySelectorAll('input[name="work_exp_mode"]').forEach(radio => {
+    radio.checked = radio.value === resumeOptions.workExpMode;
+    radio.onchange = () => {
+      if (radio.checked) resumeOptions.workExpMode = radio.value;
+    };
+  });
+
+  // Select all button
+  const selectAllBtn = document.getElementById('rsalign-select-all');
+  selectAllBtn.onclick = () => {
+    const chips = document.querySelectorAll('.rsalign-kw-chip');
+    const allSelected = [...chips].every(c => c.classList.contains('selected'));
+    chips.forEach(chip => {
+      if (allSelected) {
+        chip.classList.remove('selected');
+      } else {
+        chip.classList.add('selected');
+      }
+    });
+    resumeOptions.keywords = allSelected
+      ? []
+      : missing.map(m => m.skill);
+    updateKwCount(missing.length);
+  };
+
+  // Custom keyword input: press Enter to add chip
+  const kwInput = document.getElementById('rsalign-kw-input');
+  kwInput.value = '';
+  kwInput.onkeydown = (e) => {
+    if (e.key !== 'Enter') return;
+    const kw = kwInput.value.trim();
+    if (!kw) return;
+    kwInput.value = '';
+    // Avoid duplicates
+    if (resumeOptions.keywords.includes(kw)) return;
+    resumeOptions.keywords.push(kw);
+    const chip = document.createElement('button');
+    chip.className = 'rsalign-kw-chip selected';
+    chip.dataset.keyword = kw;
+    chip.type = 'button';
+    chip.innerHTML = `<span class="rsalign-kw-chip-check"></span><span>${kw}</span>`;
+    chip.addEventListener('click', () => {
+      chip.classList.remove('selected');
+      resumeOptions.keywords = resumeOptions.keywords.filter(k => k !== kw);
+      chip.remove();
+      updateKwCount(missing.length);
+    });
+    document.getElementById('rsalign-kw-chips').appendChild(chip);
+    updateKwCount(missing.length);
+  };
+
+  showScreen('resume-align');
+}
+
+function updateKwCount(total) {
+  const selected = document.querySelectorAll('.rsalign-kw-chip.selected').length;
+  const totalCount = total ?? document.querySelectorAll('.rsalign-kw-chip').length;
+  document.getElementById('rsalign-kw-count').textContent = `(${selected}/${totalCount})`;
+}
+
 async function startResumeGeneration() {
   showScreen('resume-loading');
 
@@ -817,6 +938,9 @@ async function startResumeGeneration() {
     const rewritten = await ask('REWRITE_RESUME', {
       profile,
       jdParsed: cached.jd_parsed,
+      sections: resumeOptions.sections,
+      workExpMode: resumeOptions.workExpMode,
+      extraKeywords: resumeOptions.keywords,
     });
 
     cached.rewritten = rewritten;
@@ -826,7 +950,7 @@ async function startResumeGeneration() {
     applyResumeKeywords(cached.jd_parsed);
     showScreen('resume-view');
   } catch (err) {
-    showScreen('resume-diff');
+    showScreen('resume-align');
     showError('简历定制失败，请重试');
     console.error(err);
   }

@@ -8,15 +8,17 @@ let currentCacheKey = null;
 let parsedProfile  = null;   // temp storage during onboarding confirm
 
 const resumeOptions = {
-  sections: ['summary', 'skills', 'work_experience', 'projects'],
-  workExpMode: 'quick',
-  keywords: [],
+  sections: ['summary', 'work_experience', 'projects'],
+  workExpMode: 'full',
+  partialKeywords: [],
+  missingKeywords: [],
 };
 
 // ─────────────────────────────────────────────
 // Screen management
 // ─────────────────────────────────────────────
 const ALL_SCREENS = [
+  'login',
   'onboarding', 'parsing', 'confirm',
   'home', 'no-job', 'analyzing', 'results', 'limit', 'settings',
   'resume-diff', 'resume-align', 'resume-loading', 'resume-view'
@@ -40,22 +42,85 @@ async function save(obj) {
 }
 
 // ─────────────────────────────────────────────
+// Sync storage helpers (for usage counter)
+// ─────────────────────────────────────────────
+function loadSync(key) {
+  return new Promise(resolve => chrome.storage.sync.get(key, resolve));
+}
+
+function saveSync(obj) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.set(obj, () => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve();
+    });
+  });
+}
+
+// ─────────────────────────────────────────────
+// Google auth
+// Setup: create an OAuth2 client ID in Google Cloud Console
+//   → APIs & Services → Credentials → Create → OAuth client ID → Chrome App
+//   → enter your extension's ID → copy the client_id into manifest.json "oauth2"
+// ─────────────────────────────────────────────
+async function signIn() {
+  const token = await new Promise((resolve, reject) => {
+    chrome.identity.getAuthToken({ interactive: true }, tok => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve(tok);
+    });
+  });
+
+  const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!resp.ok) throw new Error('获取 Google 账号信息失败');
+
+  const info = await resp.json();
+  await save({ user: { sub: info.sub, email: info.email, name: info.name || info.email } });
+  return info;
+}
+
+async function signOut() {
+  try {
+    const token = await new Promise(resolve => {
+      chrome.identity.getAuthToken({ interactive: false }, tok => {
+        resolve(chrome.runtime.lastError ? null : tok);
+      });
+    });
+    if (token) {
+      chrome.identity.removeCachedAuthToken({ token }, () => {});
+      fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`).catch(() => {});
+    }
+  } catch {}
+  await chrome.storage.local.remove('user');
+}
+
+// ─────────────────────────────────────────────
 // Daily usage
 // ─────────────────────────────────────────────
 const DAILY_LIMIT = 30;
 
 async function getUsageCount() {
+  const { user } = await load('user');
+  if (!user) return 0;
+  const key = `u_${user.sub}`;
   const today = todayStr();
-  const { usage } = await load('usage');
+  const data = await loadSync(key);
+  const usage = data[key];
   return (usage?.date === today) ? usage.count : 0;
 }
 
 async function tryIncrementUsage() {
+  const { user } = await load('user');
+  if (!user) return false;
+  const key = `u_${user.sub}`;
   const today = todayStr();
-  const { usage } = await load('usage');
+  const data = await loadSync(key);
+  const usage = data[key];
   const count = (usage?.date === today) ? usage.count : 0;
   if (count >= DAILY_LIMIT) return false;
-  await save({ usage: { date: today, count: count + 1 } });
+  await saveSync({ [key]: { date: today, count: count + 1 } });
   return true;
 }
 
@@ -143,8 +208,13 @@ function makeCacheKey(company, title) {
 document.addEventListener('DOMContentLoaded', async () => {
   bindStaticListeners();
 
-  const { setup_done } = await load('setup_done');
+  const { user } = await load('user');
+  if (!user) {
+    showScreen('login');
+    return;
+  }
 
+  const { setup_done } = await load('setup_done');
   if (!setup_done) {
     showScreen('onboarding');
   } else {
@@ -156,6 +226,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Bind all static listeners once
 // ─────────────────────────────────────────────
 function bindStaticListeners() {
+
+  // ── Login ──
+  document.getElementById('btn-google-login').addEventListener('click', async () => {
+    const btn   = document.getElementById('btn-google-login');
+    const errEl = document.getElementById('login-error');
+    btn.disabled  = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 登录中…';
+    errEl.classList.add('hidden');
+
+    try {
+      await signIn();
+      const { setup_done } = await load('setup_done');
+      if (!setup_done) {
+        showScreen('onboarding');
+      } else {
+        await initMainFlow();
+      }
+    } catch (err) {
+      console.error(err);
+      errEl.textContent = '登录失败，请重试';
+      errEl.classList.remove('hidden');
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="fa-brands fa-google"></i> 使用 Google 账号登录';
+    }
+  });
+
+  // ── Logout ──
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    await signOut();
+    const btn   = document.getElementById('btn-google-login');
+    btn.disabled  = false;
+    btn.innerHTML = '<i class="fa-brands fa-google"></i> 使用 Google 账号登录';
+    document.getElementById('login-error').classList.add('hidden');
+    showScreen('login');
+  });
 
   // ── Onboarding ──
   document.getElementById('input-resume').addEventListener('change', (e) => {
@@ -176,6 +281,7 @@ function bindStaticListeners() {
   document.getElementById('btn-confirm-done').addEventListener('click', async () => {
     if (!parsedProfile) return;
     await save({ profile: parsedProfile, setup_done: true });
+    sendUserEvent('onboarding_completed', {});
     await initMainFlow();
   });
 
@@ -247,6 +353,7 @@ function bindStaticListeners() {
       const text = document.getElementById(`greeting-text-${idx}`)?.textContent;
       if (!text || text === '—') return;
       await navigator.clipboard.writeText(text);
+      sendUserEvent('greeting_copied', { greeting_index: Number(idx), content: text });
       const original = btn.textContent;
       btn.textContent = '已复制 ✓';
       btn.classList.add('copied');
@@ -312,6 +419,9 @@ function bindStaticListeners() {
   document.getElementById('btn-home-resume-entry')?.addEventListener('click', () =>
     openSettings()
   );
+
+  initGreetingFeedback();
+  initResumeFeedback();
 }
 
 // ─────────────────────────────────────────────
@@ -343,23 +453,7 @@ async function initMainFlow(showDetectFeedback = false) {
 }
 
 async function updateUsageDisplay() {
-  const count = await getUsageCount();
-  document.getElementById('usage-used').textContent = count;
-
-  const progress = document.getElementById('home-usage-progress');
-  if (progress) {
-    progress.style.width = `${Math.min(100, Math.round((count / DAILY_LIMIT) * 100))}%`;
-  }
-
-  const { applications = [], profile, cache = {} } = await load('applications', 'profile', 'cache');
-  const applied = applications.filter(a => a.feedback === 'applied').length;
-  const pendingRecords = applications.filter(a => a.feedback === 'not_applied').length;
-  const pending = pendingRecords || (currentJob ? 1 : 0);
-
-  const appliedEl = document.getElementById('home-applied-count');
-  const pendingEl = document.getElementById('home-pending-count');
-  if (appliedEl) appliedEl.textContent = applied;
-  if (pendingEl) pendingEl.textContent = pending;
+  const { profile, cache = {} } = await load('profile', 'cache');
 
   const resumeEl = document.getElementById('home-resume-status');
   if (resumeEl) {
@@ -440,20 +534,56 @@ async function handleResumeUpload(file) {
 }
 
 function renderConfirmScreen(profile) {
-  document.getElementById('cf-role').textContent   = profile.basic?.target_role || '—';
-  document.getElementById('cf-years').textContent  = profile.basic?.years ? `${profile.basic.years} 年` : '—';
-  document.getElementById('cf-salary').textContent = profile.basic?.salary || '—';
+  const b = profile.basic || {};
+  document.getElementById('cf-name').textContent    = b.name        || '—';
+  document.getElementById('cf-role').textContent    = b.target_role || '—';
+  document.getElementById('cf-years').textContent   = b.years ? `${b.years} 年` : '—';
+  document.getElementById('cf-salary').textContent  = b.salary      || '—';
+  document.getElementById('cf-contact').textContent = b.contact     || '—';
 
-  const container = document.getElementById('confirm-exp');
-  container.innerHTML = '';
-  (profile.experiences || []).slice(0, 3).forEach(exp => {
+  // Work experiences — all entries, with highlights
+  const expContainer = document.getElementById('confirm-exp');
+  expContainer.innerHTML = '';
+  (profile.experiences || []).forEach(exp => {
     const div = document.createElement('div');
     div.className = 'exp-item';
-    div.innerHTML = `
+
+    const header = document.createElement('div');
+    header.innerHTML = `
       <span class="exp-company">${exp.company || '—'}</span>
-      <span class="exp-role-period">${exp.role || ''} · ${exp.period || ''}</span>
+      <span class="exp-role-period">${[exp.role, exp.period].filter(Boolean).join(' · ')}</span>
     `;
-    container.appendChild(div);
+    div.appendChild(header);
+
+    if (exp.highlights?.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'exp-highlights';
+      exp.highlights.forEach(h => {
+        const li = document.createElement('li');
+        li.textContent = h;
+        ul.appendChild(li);
+      });
+      div.appendChild(ul);
+    }
+
+    expContainer.appendChild(div);
+  });
+
+  // Education
+  const eduContainer = document.getElementById('confirm-edu');
+  const eduBlock = document.getElementById('confirm-edu-block');
+  const edus = profile.education || [];
+  eduBlock.style.display = edus.length ? '' : 'none';
+  eduContainer.innerHTML = '';
+  edus.forEach(edu => {
+    const div = document.createElement('div');
+    div.className = 'edu-item';
+    div.innerHTML = `
+      <span class="edu-school">${edu.school || '—'}</span>
+      <span class="edu-detail">${[edu.degree, edu.major].filter(Boolean).join(' · ')}</span>
+      <span class="edu-period">${edu.period || ''}</span>
+    `;
+    eduContainer.appendChild(div);
   });
 }
 
@@ -463,9 +593,11 @@ function renderConfirmScreen(profile) {
 function toggleBasicEdit(btn) {
   const saving = btn.textContent.trim() === '保存';
   const fieldDefs = [
-    { id: 'cf-role',   key: 'target_role', parse: v => v },
-    { id: 'cf-years',  key: 'years',       parse: v => parseInt(v) || v },
-    { id: 'cf-salary', key: 'salary',      parse: v => v },
+    { id: 'cf-name',    key: 'name',        parse: v => v },
+    { id: 'cf-role',    key: 'target_role', parse: v => v },
+    { id: 'cf-years',   key: 'years',       parse: v => parseInt(v) || v },
+    { id: 'cf-salary',  key: 'salary',      parse: v => v },
+    { id: 'cf-contact', key: 'contact',     parse: v => v },
   ];
 
   if (!saving) {
@@ -549,6 +681,9 @@ async function runAnalysis() {
     renderResults(entry);
     await restoreFeedbackState();
     showScreen('results');
+    const matched = (entry.matches || []).filter(m => m.status === 'match').length;
+    const missing = (entry.matches || []).filter(m => m.status === 'missing').length;
+    sendUserEvent('jd_analyzed', { score: entry.score, matched_count: matched, missing_count: missing });
   } catch (err) {
     showScreen('home');
     showError('分析失败，请检查网络后重试');
@@ -697,7 +832,235 @@ function renderGreetings(greetings) {
     const el = document.getElementById(`greeting-text-${i}`);
     if (el) el.textContent = g.text ?? g;
   });
+  resetGreetingFeedbackState();
   document.getElementById('greetings-panel').classList.remove('hidden');
+}
+
+// ─────────────────────────────────────────────
+// AI 反馈（点赞 / 点踩）
+// ─────────────────────────────────────────────
+async function sendAiFeedback(payload) {
+  try {
+    const { user }  = await load('user');
+    const { cache } = await load('cache');
+    const job = cache?.[currentCacheKey] || {};
+    await ask('RECORD_FEEDBACK', {
+      user_id:        user?.sub        || null,
+      user_email:     user?.email      || null,
+      company:        job.company      || null,
+      title:          job.title        || null,
+      ...payload,
+    });
+  } catch (err) {
+    console.error('反馈记录失败', err);
+  }
+}
+
+async function sendUserEvent(event_type, properties = {}) {
+  try {
+    const { user }  = await load('user');
+    const { cache } = await load('cache');
+    const job = cache?.[currentCacheKey] || {};
+    await ask('RECORD_EVENT', {
+      user_email: user?.email || null,
+      event_type,
+      company:    job.company || null,
+      title:      job.title   || null,
+      properties,
+    });
+  } catch (err) {
+    console.error('事件记录失败', err);
+  }
+}
+
+function showAiFeedbackThanks(anchorEl) {
+  const thanks = document.createElement('span');
+  thanks.className   = 'ai-feedback-thanks';
+  thanks.textContent = '感谢反馈';
+  anchorEl.appendChild(thanks);
+  setTimeout(() => thanks.remove(), 1500);
+}
+
+function initGreetingFeedback() {
+  [0, 1].forEach(i => {
+    const likeBtn    = document.querySelector(`.btn-ai-like[data-index="${i}"]`);
+    const dislikeBtn = document.querySelector(`.btn-ai-dislike[data-index="${i}"]`);
+    const reasonsEl  = document.querySelector(`.dislike-reasons[data-index="${i}"]`);
+    const confirmBtn = document.querySelector(`.btn-dislike-confirm[data-index="${i}"]`);
+    if (!likeBtn || !dislikeBtn) return;
+
+    likeBtn.addEventListener('click', async () => {
+      const wasActive    = likeBtn.classList.contains('active');
+      const wasCommitted = likeBtn.dataset.committed === 'true';
+      const content      = document.getElementById(`greeting-text-${i}`)?.textContent || null;
+
+      if (wasActive) {
+        likeBtn.classList.remove('active');
+        likeBtn.dataset.committed = 'false';
+        if (wasCommitted) {
+          await sendAiFeedback({ feature_type: 'greeting', greeting_index: i, feedback_type: 'like', cancelled: true, dislike_reasons: null, content });
+        }
+      } else {
+        // Cancel committed dislike if switching
+        if (dislikeBtn.classList.contains('active') && dislikeBtn.dataset.committed === 'true') {
+          dislikeBtn.dataset.committed = 'false';
+          await sendAiFeedback({ feature_type: 'greeting', greeting_index: i, feedback_type: 'dislike', cancelled: true, dislike_reasons: null, content });
+        }
+        dislikeBtn.classList.remove('active');
+        reasonsEl?.classList.add('hidden');
+        likeBtn.classList.add('active');
+        likeBtn.dataset.committed = 'true';
+        await sendAiFeedback({ feature_type: 'greeting', greeting_index: i, feedback_type: 'like', cancelled: false, dislike_reasons: null, content });
+      }
+    });
+
+    dislikeBtn.addEventListener('click', async () => {
+      const wasActive    = dislikeBtn.classList.contains('active');
+      const wasCommitted = dislikeBtn.dataset.committed === 'true';
+      const content      = document.getElementById(`greeting-text-${i}`)?.textContent || null;
+
+      if (wasActive) {
+        dislikeBtn.classList.remove('active');
+        dislikeBtn.dataset.committed = 'false';
+        reasonsEl?.classList.add('hidden');
+        reasonsEl?.querySelectorAll('.dislike-reason-tag').forEach(t => t.classList.remove('selected'));
+        confirmBtn?.classList.add('hidden');
+        if (wasCommitted) {
+          await sendAiFeedback({ feature_type: 'greeting', greeting_index: i, feedback_type: 'dislike', cancelled: true, dislike_reasons: null, content });
+        }
+      } else {
+        // Cancel committed like if switching
+        if (likeBtn.classList.contains('active') && likeBtn.dataset.committed === 'true') {
+          likeBtn.dataset.committed = 'false';
+          await sendAiFeedback({ feature_type: 'greeting', greeting_index: i, feedback_type: 'like', cancelled: true, dislike_reasons: null, content });
+        }
+        likeBtn.classList.remove('active');
+        dislikeBtn.classList.add('active');
+        reasonsEl?.classList.remove('hidden');
+      }
+    });
+
+    reasonsEl?.querySelectorAll('.dislike-reason-tag').forEach(tag => {
+      tag.addEventListener('click', () => {
+        tag.classList.toggle('selected');
+        const hasSelected = reasonsEl.querySelectorAll('.dislike-reason-tag.selected').length > 0;
+        confirmBtn?.classList.toggle('hidden', !hasSelected);
+      });
+    });
+
+    confirmBtn?.addEventListener('click', async () => {
+      const selected = [...reasonsEl.querySelectorAll('.dislike-reason-tag.selected')]
+        .map(el => el.dataset.reason);
+      if (!selected.length) return;
+      const content = document.getElementById(`greeting-text-${i}`)?.textContent || null;
+      dislikeBtn.dataset.committed = 'true';
+      await sendAiFeedback({ feature_type: 'greeting', greeting_index: i, feedback_type: 'dislike', cancelled: false, dislike_reasons: selected, content });
+      reasonsEl.classList.add('hidden');
+      reasonsEl.querySelectorAll('.dislike-reason-tag').forEach(t => t.classList.remove('selected'));
+      confirmBtn.classList.add('hidden');
+      const row = document.querySelector(`.ai-feedback-row[data-index="${i}"]`);
+      showAiFeedbackThanks(row);
+    });
+  });
+}
+
+function resetGreetingFeedbackState() {
+  [0, 1].forEach(i => {
+    const like    = document.querySelector(`.btn-ai-like[data-index="${i}"]`);
+    const dislike = document.querySelector(`.btn-ai-dislike[data-index="${i}"]`);
+    if (like)    { like.classList.remove('active');    like.dataset.committed    = 'false'; }
+    if (dislike) { dislike.classList.remove('active'); dislike.dataset.committed = 'false'; }
+    const reasonsEl = document.querySelector(`.dislike-reasons[data-index="${i}"]`);
+    reasonsEl?.classList.add('hidden');
+    reasonsEl?.querySelectorAll('.dislike-reason-tag').forEach(t => t.classList.remove('selected'));
+    document.querySelector(`.btn-dislike-confirm[data-index="${i}"]`)?.classList.add('hidden');
+  });
+}
+
+function initResumeFeedback() {
+  const likeBtn    = document.getElementById('btn-resume-like');
+  const dislikeBtn = document.getElementById('btn-resume-dislike');
+  const reasonsEl  = document.getElementById('resume-dislike-reasons');
+  const confirmBtn = document.getElementById('btn-resume-dislike-confirm');
+  if (!likeBtn || !dislikeBtn) return;
+
+  likeBtn.addEventListener('click', async () => {
+    const wasActive    = likeBtn.classList.contains('active');
+    const wasCommitted = likeBtn.dataset.committed === 'true';
+
+    if (wasActive) {
+      likeBtn.classList.remove('active');
+      likeBtn.dataset.committed = 'false';
+      if (wasCommitted) {
+        await sendAiFeedback({ feature_type: 'resume', greeting_index: null, feedback_type: 'like', cancelled: true, dislike_reasons: null, content: null });
+      }
+    } else {
+      if (dislikeBtn.classList.contains('active') && dislikeBtn.dataset.committed === 'true') {
+        dislikeBtn.dataset.committed = 'false';
+        await sendAiFeedback({ feature_type: 'resume', greeting_index: null, feedback_type: 'dislike', cancelled: true, dislike_reasons: null, content: null });
+      }
+      dislikeBtn.classList.remove('active');
+      reasonsEl?.classList.add('hidden');
+      likeBtn.classList.add('active');
+      likeBtn.dataset.committed = 'true';
+      await sendAiFeedback({ feature_type: 'resume', greeting_index: null, feedback_type: 'like', cancelled: false, dislike_reasons: null, content: null });
+    }
+  });
+
+  dislikeBtn.addEventListener('click', async () => {
+    const wasActive    = dislikeBtn.classList.contains('active');
+    const wasCommitted = dislikeBtn.dataset.committed === 'true';
+
+    if (wasActive) {
+      dislikeBtn.classList.remove('active');
+      dislikeBtn.dataset.committed = 'false';
+      reasonsEl?.classList.add('hidden');
+      reasonsEl?.querySelectorAll('.dislike-reason-tag').forEach(t => t.classList.remove('selected'));
+      confirmBtn?.classList.add('hidden');
+      if (wasCommitted) {
+        await sendAiFeedback({ feature_type: 'resume', greeting_index: null, feedback_type: 'dislike', cancelled: true, dislike_reasons: null, content: null });
+      }
+    } else {
+      if (likeBtn.classList.contains('active') && likeBtn.dataset.committed === 'true') {
+        likeBtn.dataset.committed = 'false';
+        await sendAiFeedback({ feature_type: 'resume', greeting_index: null, feedback_type: 'like', cancelled: true, dislike_reasons: null, content: null });
+      }
+      likeBtn.classList.remove('active');
+      dislikeBtn.classList.add('active');
+      reasonsEl?.classList.remove('hidden');
+    }
+  });
+
+  reasonsEl?.querySelectorAll('.dislike-reason-tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      tag.classList.toggle('selected');
+      const hasSelected = reasonsEl.querySelectorAll('.dislike-reason-tag.selected').length > 0;
+      confirmBtn?.classList.toggle('hidden', !hasSelected);
+    });
+  });
+
+  confirmBtn?.addEventListener('click', async () => {
+    const selected = [...reasonsEl.querySelectorAll('.dislike-reason-tag.selected')]
+      .map(el => el.dataset.reason);
+    if (!selected.length) return;
+    dislikeBtn.dataset.committed = 'true';
+    await sendAiFeedback({ feature_type: 'resume', greeting_index: null, feedback_type: 'dislike', cancelled: false, dislike_reasons: selected, content: null });
+    reasonsEl.classList.add('hidden');
+    reasonsEl.querySelectorAll('.dislike-reason-tag').forEach(t => t.classList.remove('selected'));
+    confirmBtn.classList.add('hidden');
+    showAiFeedbackThanks(document.getElementById('resume-feedback-row'));
+  });
+}
+
+function resetResumeFeedbackState() {
+  const like    = document.getElementById('btn-resume-like');
+  const dislike = document.getElementById('btn-resume-dislike');
+  if (like)    { like.classList.remove('active');    like.dataset.committed    = 'false'; }
+  if (dislike) { dislike.classList.remove('active'); dislike.dataset.committed = 'false'; }
+  const reasonsEl = document.getElementById('resume-dislike-reasons');
+  reasonsEl?.classList.add('hidden');
+  reasonsEl?.querySelectorAll('.dislike-reason-tag').forEach(t => t.classList.remove('selected'));
+  document.getElementById('btn-resume-dislike-confirm')?.classList.add('hidden');
 }
 
 // ─────────────────────────────────────────────
@@ -723,6 +1086,15 @@ async function handleFeedback(status) {
   else          applications.push(record);
 
   await save({ applications });
+
+  await sendAiFeedback({
+    feature_type:    'application',
+    greeting_index:  null,
+    feedback_type:   status,
+    cancelled:       false,
+    dislike_reasons: null,
+    content:         null,
+  });
 }
 
 async function restoreFeedbackState() {
@@ -762,7 +1134,9 @@ function showError(msg) {
 // Settings screen
 // ─────────────────────────────────────────────
 async function openSettings() {
-  const { profile } = await load('profile');
+  const { profile, user } = await load('profile', 'user');
+
+  document.getElementById('s-google-email').textContent = user?.email || '—';
 
   const b = profile?.basic || {};
   document.getElementById('s-name').textContent = b.name || '—';
@@ -790,23 +1164,22 @@ async function initResumeDiff() {
   document.getElementById('rsdiff-job').textContent =
     `${cached.company || ''} · ${cached.title || ''}`;
 
-  const tagsEl  = document.getElementById('rsdiff-tags');
-  const statEl  = document.getElementById('rsdiff-stat');
   const matches = cached.matches || [];
-  tagsEl.innerHTML = '';
-
   const iconMap = { match: 'fa-circle-check', partial: 'fa-bolt', missing: 'fa-circle-xmark' };
-  matches.forEach(m => {
-    const pill = document.createElement('div');
-    pill.className = `rsdiff-pill ${m.status}`;
-    pill.innerHTML = `<i class="fa-solid ${iconMap[m.status] || 'fa-circle'}"></i><span>${m.skill}</span>`;
-    tagsEl.appendChild(pill);
-  });
 
-  const mc = matches.filter(m => m.status === 'match').length;
-  const pc = matches.filter(m => m.status === 'partial').length;
-  const xc = matches.filter(m => m.status === 'missing').length;
-  statEl.textContent = `${mc} 项完全匹配 · ${pc} 项待加强 · ${xc} 项需补充`;
+  ['match', 'partial', 'missing'].forEach(status => {
+    const group = matches.filter(m => m.status === status);
+    document.getElementById(`rsdiff-group-${status}`).style.display = group.length ? '' : 'none';
+    document.getElementById(`rsdiff-cnt-${status}`).textContent = `${group.length} 项`;
+    const tagsEl = document.getElementById(`rsdiff-tags-${status}`);
+    tagsEl.innerHTML = '';
+    group.forEach(m => {
+      const pill = document.createElement('div');
+      pill.className = `rsdiff-pill ${status}`;
+      pill.innerHTML = `<i class="fa-solid ${iconMap[status]}"></i><span>${m.skill}</span>`;
+      tagsEl.appendChild(pill);
+    });
+  });
 
   // If already generated, jump straight to view
   if (cached.rewritten) {
@@ -825,33 +1198,37 @@ async function initResumeAlign() {
   if (!cached) return;
 
   // Reset keyword selection
-  resumeOptions.keywords = [];
-  resumeOptions.sections = ['summary', 'skills', 'work_experience', 'projects'];
+  resumeOptions.partialKeywords = [];
+  resumeOptions.missingKeywords = [];
+  resumeOptions.sections = ['summary', 'work_experience', 'projects'];
   resumeOptions.workExpMode = 'quick';
 
-  const missing = (cached.matches || []).filter(m => m.status === 'missing');
+  const improvable = (cached.matches || []).filter(m => m.status === 'missing' || m.status === 'partial');
   const chipsEl = document.getElementById('rsalign-kw-chips');
   chipsEl.innerHTML = '';
 
-  missing.forEach(m => {
+  improvable.forEach(m => {
     const chip = document.createElement('button');
     chip.className = 'rsalign-kw-chip';
     chip.dataset.keyword = m.skill;
+    chip.dataset.status = m.status;
     chip.type = 'button';
     chip.innerHTML = `<span class="rsalign-kw-chip-check"></span><span>${m.skill}</span>`;
     chip.addEventListener('click', () => {
       chip.classList.toggle('selected');
+      const arr = m.status === 'partial' ? resumeOptions.partialKeywords : resumeOptions.missingKeywords;
       if (chip.classList.contains('selected')) {
-        resumeOptions.keywords.push(m.skill);
+        arr.push(m.skill);
       } else {
-        resumeOptions.keywords = resumeOptions.keywords.filter(k => k !== m.skill);
+        const idx = arr.indexOf(m.skill);
+        if (idx > -1) arr.splice(idx, 1);
       }
-      updateKwCount(missing.length);
+      updateKwCount(improvable.length);
     });
     chipsEl.appendChild(chip);
   });
 
-  updateKwCount(missing.length);
+  updateKwCount(improvable.length);
 
   // Section checkboxes → update resumeOptions.sections
   document.querySelectorAll('.rsalign-check').forEach(cb => {
@@ -862,18 +1239,6 @@ async function initResumeAlign() {
       } else {
         resumeOptions.sections = resumeOptions.sections.filter(s => s !== cb.value);
       }
-      // Show/hide work experience sub-options
-      if (cb.value === 'work_experience') {
-        document.getElementById('rsalign-work-sub').classList.toggle('hidden', !cb.checked);
-      }
-    };
-  });
-
-  // Work experience mode radios
-  document.querySelectorAll('input[name="work_exp_mode"]').forEach(radio => {
-    radio.checked = radio.value === resumeOptions.workExpMode;
-    radio.onchange = () => {
-      if (radio.checked) resumeOptions.workExpMode = radio.value;
     };
   });
 
@@ -882,12 +1247,19 @@ async function initResumeAlign() {
   selectAllBtn.onclick = () => {
     const chips = [...document.querySelectorAll('.rsalign-kw-chip')];
     const allSelected = chips.every(c => c.classList.contains('selected'));
-    chips.forEach(chip => chip.classList.toggle('selected', !allSelected));
-    resumeOptions.keywords = allSelected ? [] : chips.map(c => c.dataset.keyword);
+    resumeOptions.partialKeywords = [];
+    resumeOptions.missingKeywords = [];
+    chips.forEach(chip => {
+      chip.classList.toggle('selected', !allSelected);
+      if (!allSelected) {
+        if (chip.dataset.status === 'partial') resumeOptions.partialKeywords.push(chip.dataset.keyword);
+        else resumeOptions.missingKeywords.push(chip.dataset.keyword);
+      }
+    });
     updateKwCount(chips.length);
   };
 
-  // Custom keyword input: press Enter to add chip
+  // Custom keyword input: press Enter to add chip (归入 missingKeywords)
   const kwInput = document.getElementById('rsalign-kw-input');
   kwInput.value = '';
   kwInput.onkeydown = (e) => {
@@ -896,21 +1268,22 @@ async function initResumeAlign() {
     if (!kw) return;
     kwInput.value = '';
     // Avoid duplicates
-    if (resumeOptions.keywords.includes(kw)) return;
-    resumeOptions.keywords.push(kw);
+    if (resumeOptions.missingKeywords.includes(kw) || resumeOptions.partialKeywords.includes(kw)) return;
+    resumeOptions.missingKeywords.push(kw);
     const chip = document.createElement('button');
     chip.className = 'rsalign-kw-chip selected';
     chip.dataset.keyword = kw;
+    chip.dataset.status = 'missing';
     chip.type = 'button';
     chip.innerHTML = `<span class="rsalign-kw-chip-check"></span><span>${kw}</span>`;
     chip.addEventListener('click', () => {
       chip.classList.remove('selected');
-      resumeOptions.keywords = resumeOptions.keywords.filter(k => k !== kw);
+      resumeOptions.missingKeywords = resumeOptions.missingKeywords.filter(k => k !== kw);
       chip.remove();
-      updateKwCount(missing.length);
+      updateKwCount(improvable.length);
     });
     document.getElementById('rsalign-kw-chips').appendChild(chip);
-    updateKwCount(missing.length);
+    updateKwCount(improvable.length);
   };
 
   showScreen('resume-align');
@@ -934,7 +1307,8 @@ async function startResumeGeneration() {
       jdParsed: cached.jd_parsed,
       sections: resumeOptions.sections,
       workExpMode: resumeOptions.workExpMode,
-      extraKeywords: resumeOptions.keywords,
+      partialKeywords: resumeOptions.partialKeywords,
+      missingKeywords: resumeOptions.missingKeywords,
     });
 
     cached.rewritten = rewritten;
@@ -942,6 +1316,7 @@ async function startResumeGeneration() {
 
     renderResumeInline(profile, rewritten);
     applyResumeKeywords(cached.jd_parsed);
+    resetResumeFeedbackState();
     showScreen('resume-view');
   } catch (err) {
     showScreen('resume-align');
@@ -1096,6 +1471,7 @@ async function downloadResumePdf() {
       })
       .from(document.getElementById('rs-resume-page'))
       .save();
+    sendUserEvent('resume_downloaded', {});
   } finally {
     btn.disabled  = false;
     btn.innerHTML = '<i class="fa-solid fa-file-arrow-down"></i> 下载简历';

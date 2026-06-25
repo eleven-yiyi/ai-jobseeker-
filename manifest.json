@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "招聘助手",
+  "name": "求职助手",
   "version": "1.0.0",
-  "description": "AI 驱动的招聘助手：JD 解析 · 匹配评分 · 定制简历",
+  "description": "AI 驱动的求职助手：JD 解析 · 匹配评分 · 定制简历",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApr1OzsefhIcEX1gRkFGwuEM4ZdNbvLYrPCOLyI8zuPxdR0gWPTHiAjDG/PH827bceH+vVFCGCx9P56pZ0A0NkopdXURDx2U5Pb1yrsSQe0te+aPYwJwyVoU3VptFgVK7wrzqWbafYqRe7KWEl/80ctFq48MGWQVYSPlVb0I1DlvVUA342ZEDUR12eVwHq27OY4kOX4vDWrxVAmcv5alXx3mZN6AFqJv74vB4hYInmtfe7H0AXcvn9rjT5rUVOuyLBf+G94SpkKj+hSe3kzGM8cI1J1AGW1LzzWhutunaiR6eIVr324u0E4IqWyjj8zMBkT5zpNKGcUDAQ3c4sYkH6wIDAQAB",
   "icons": {
     "16":  "assets/icons/icon-16.png",
     "48":  "assets/icons/icon-48.png",
@@ -37,10 +38,18 @@
     "storage",
     "activeTab",
     "sidePanel",
-    "scripting"
+    "scripting",
+    "identity"
   ],
+  "oauth2": {
+    "client_id": "970962109504-3731c45qqntki6r8be0jkoiqao3utdkr.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  },
   "host_permissions": [
     "https://api.deepseek.com/*",
+    "https://www.googleapis.com/*",
+    "https://accounts.google.com/*",
+    "https://*.supabase.co/*",
     "https://www.zhipin.com/*",
     "https://www.zhaopin.com/*",
     "https://www.liepin.com/*",

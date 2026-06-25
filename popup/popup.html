@@ -2,13 +2,45 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>招聘助手</title>
+  <title>求职助手</title>
   <link rel="stylesheet" href="../lib/fontawesome/css/all.min.css">
   <script src="../lib/pdf.min.js"></script>
   <script src="../lib/html2pdf.bundle.min.js"></script>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Login — Google 登录
+  ══════════════════════════════════════ -->
+  <div id="screen-login" class="screen hidden">
+
+    <main class="content content-center">
+      <div class="login-wrap">
+
+        <div class="login-logo">
+          <img src="../assets/icons/icon-128.png" alt="求职助手">
+        </div>
+
+        <h1 class="login-title">求职助手</h1>
+        <p class="login-platforms">BOSS直聘 / 智联招聘 / 猎聘 / 拉勾</p>
+        <p class="login-sub">登录后每天可免费分析 30 个职位<br>数据仅保存在本地，不上传任何服务器</p>
+
+        <button class="btn-primary btn-full btn-google" id="btn-google-login">
+          <i class="fa-brands fa-google"></i> 使用 Google 账号登录
+        </button>
+
+        <p class="login-error hidden" id="login-error"></p>
+
+        <p class="privacy-note">
+          <i class="fa-solid fa-shield-halved"></i>
+          仅读取账号 ID 用于限额管理，不存储任何 Google 数据
+        </p>
+      </div>
+    </main>
+
+  </div>
+
 
   <!-- ══════════════════════════════════════
        SCREEN: Settings — 设置 / 个人档案
@@ -33,6 +65,17 @@
         <div class="profile-info">
           <p class="profile-name"  id="s-name">—</p>
           <p class="profile-meta"  id="s-meta">—</p>
+        </div>
+      </div>
+
+      <!-- Google 账号 -->
+      <div class="card settings-block">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <span class="settings-label">登录账号</span>
+            <span class="settings-value" id="s-google-email">—</span>
+          </div>
+          <button class="btn-edit btn-logout" id="btn-logout">退出</button>
         </div>
       </div>
 
@@ -123,6 +166,10 @@
         </div>
         <div class="confirm-fields" id="confirm-basic">
           <div class="confirm-row">
+            <span class="confirm-key">姓名</span>
+            <span class="confirm-val" id="cf-name">—</span>
+          </div>
+          <div class="confirm-row">
             <span class="confirm-key">目标岗位</span>
             <span class="confirm-val" id="cf-role">—</span>
           </div>
@@ -134,16 +181,30 @@
             <span class="confirm-key">期望薪资</span>
             <span class="confirm-val" id="cf-salary">—</span>
           </div>
+          <div class="confirm-row">
+            <span class="confirm-key">联系方式</span>
+            <span class="confirm-val" id="cf-contact">—</span>
+          </div>
         </div>
       </div>
 
-      <!-- 最近工作经历 -->
+      <!-- 工作经历 -->
       <div class="card confirm-block">
         <div class="confirm-block-header">
-          <span class="confirm-block-label">最近经历</span>
+          <span class="confirm-block-label">工作经历</span>
           <button class="btn-edit" data-target="exp">编辑</button>
         </div>
         <div id="confirm-exp">
+          <!-- JS 动态生成 -->
+        </div>
+      </div>
+
+      <!-- 教育经历 -->
+      <div class="card confirm-block" id="confirm-edu-block">
+        <div class="confirm-block-header">
+          <span class="confirm-block-label">教育经历</span>
+        </div>
+        <div id="confirm-edu">
           <!-- JS 动态生成 -->
         </div>
       </div>
@@ -182,17 +243,6 @@
       </div>
 
       <section class="dashboard-grid">
-        <div class="card metric-card">
-          <div class="metric-header">
-            <span class="metric-label">今日投递进度</span>
-            <span class="metric-value"><span id="usage-used">0</span> / 30 次</span>
-          </div>
-          <div class="mini-progress"><div class="mini-progress-fill" id="home-usage-progress"></div></div>
-          <div class="metric-subrow">
-            <span>已投递 <b id="home-applied-count">0</b></span>
-            <span>待跟进 <b id="home-pending-count">1</b></span>
-          </div>
-        </div>
 
         <div class="card resume-status-card">
           <div>
@@ -324,7 +374,20 @@
         <div class="greeting-item" id="greeting-0">
           <span class="greeting-style-tag">专业简洁</span>
           <p class="greeting-text" id="greeting-text-0">—</p>
-          <button class="btn-copy" data-index="0">复制</button>
+          <div class="greeting-actions">
+            <button class="btn-copy" data-index="0">复制</button>
+            <div class="ai-feedback-row" data-index="0">
+              <button class="btn-ai-like" data-index="0" title="有用"><i class="fa-regular fa-thumbs-up"></i></button>
+              <button class="btn-ai-dislike" data-index="0" title="没用"><i class="fa-regular fa-thumbs-down"></i></button>
+            </div>
+          </div>
+          <div class="dislike-reasons hidden" data-index="0">
+            <button class="dislike-reason-tag" data-reason="语气太生硬">语气太生硬</button>
+            <button class="dislike-reason-tag" data-reason="风格不合我">风格不合我</button>
+            <button class="dislike-reason-tag" data-reason="内容太套路">内容太套路</button>
+            <button class="dislike-reason-tag" data-reason="与职位不相关">与职位不相关</button>
+            <button class="btn-dislike-confirm hidden" data-index="0">提交</button>
+          </div>
         </div>
 
         <div class="divider"></div>
@@ -332,7 +395,20 @@
         <div class="greeting-item" id="greeting-1">
           <span class="greeting-style-tag">热情积极</span>
           <p class="greeting-text" id="greeting-text-1">—</p>
-          <button class="btn-copy" data-index="1">复制</button>
+          <div class="greeting-actions">
+            <button class="btn-copy" data-index="1">复制</button>
+            <div class="ai-feedback-row" data-index="1">
+              <button class="btn-ai-like" data-index="1" title="有用"><i class="fa-regular fa-thumbs-up"></i></button>
+              <button class="btn-ai-dislike" data-index="1" title="没用"><i class="fa-regular fa-thumbs-down"></i></button>
+            </div>
+          </div>
+          <div class="dislike-reasons hidden" data-index="1">
+            <button class="dislike-reason-tag" data-reason="语气太生硬">语气太生硬</button>
+            <button class="dislike-reason-tag" data-reason="风格不合我">风格不合我</button>
+            <button class="dislike-reason-tag" data-reason="内容太套路">内容太套路</button>
+            <button class="dislike-reason-tag" data-reason="与职位不相关">与职位不相关</button>
+            <button class="btn-dislike-confirm hidden" data-index="1">提交</button>
+          </div>
         </div>
       </div>
 
@@ -396,8 +472,32 @@
     <main class="content">
       <p class="rsdiff-title">这份简历将针对以下要求优化</p>
       <p class="rsdiff-job" id="rsdiff-job">—</p>
-      <div class="rsdiff-tags" id="rsdiff-tags"></div>
-      <p class="rsdiff-stat" id="rsdiff-stat"></p>
+      <div class="rsdiff-groups">
+        <div class="rsdiff-group" id="rsdiff-group-match">
+          <div class="rsdiff-group-hd match">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>完全匹配</span>
+            <span class="rsdiff-group-cnt" id="rsdiff-cnt-match">0 项</span>
+          </div>
+          <div class="rsdiff-tags" id="rsdiff-tags-match"></div>
+        </div>
+        <div class="rsdiff-group" id="rsdiff-group-partial">
+          <div class="rsdiff-group-hd partial">
+            <i class="fa-solid fa-bolt"></i>
+            <span>待加强</span>
+            <span class="rsdiff-group-cnt" id="rsdiff-cnt-partial">0 项</span>
+          </div>
+          <div class="rsdiff-tags" id="rsdiff-tags-partial"></div>
+        </div>
+        <div class="rsdiff-group" id="rsdiff-group-missing">
+          <div class="rsdiff-group-hd missing">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>需补充</span>
+            <span class="rsdiff-group-cnt" id="rsdiff-cnt-missing">0 项</span>
+          </div>
+          <div class="rsdiff-tags" id="rsdiff-tags-missing"></div>
+        </div>
+      </div>
     </main>
 
     <div class="rs-action-bar">
@@ -434,66 +534,36 @@
 
       <!-- Left: sections to enhance -->
       <div class="rsalign-left">
-        <p class="rsalign-col-title">选择要增强的章节</p>
+        <p class="rsalign-col-title">1. 选择要增强的章节</p>
 
         <label class="rsalign-section-row">
           <input type="checkbox" class="rsalign-check" value="summary" checked>
           <span class="rsalign-check-box"></span>
           <span class="rsalign-section-label">概括</span>
-          <i class="fa-regular fa-circle-question rsalign-help"></i>
-        </label>
-
-        <label class="rsalign-section-row">
-          <input type="checkbox" class="rsalign-check" value="skills" checked>
-          <span class="rsalign-check-box"></span>
-          <span class="rsalign-section-label">技能</span>
-          <i class="fa-regular fa-circle-question rsalign-help"></i>
         </label>
 
         <label class="rsalign-section-row">
           <input type="checkbox" class="rsalign-check" value="work_experience" checked id="rsalign-check-work">
           <span class="rsalign-check-box"></span>
           <span class="rsalign-section-label">工作经验</span>
-          <i class="fa-regular fa-circle-question rsalign-help"></i>
         </label>
-
-        <div class="rsalign-sub" id="rsalign-work-sub">
-          <label class="rsalign-radio-row">
-            <input type="radio" name="work_exp_mode" value="quick" checked>
-            <span class="rsalign-radio-dot"></span>
-            <div class="rsalign-radio-text">
-              <span class="rsalign-radio-title">快速编辑（前 2 段经历）</span>
-              <span class="rsalign-radio-desc">处理速度更快</span>
-            </div>
-          </label>
-          <label class="rsalign-radio-row">
-            <input type="radio" name="work_exp_mode" value="full">
-            <span class="rsalign-radio-dot"></span>
-            <div class="rsalign-radio-text">
-              <span class="rsalign-radio-title">完整编辑（全部经历）</span>
-              <span class="rsalign-radio-desc">处理时间较长</span>
-            </div>
-          </label>
-        </div>
 
         <label class="rsalign-section-row">
           <input type="checkbox" class="rsalign-check" value="projects" checked>
           <span class="rsalign-check-box"></span>
           <span class="rsalign-section-label">项目</span>
-          <i class="fa-regular fa-circle-question rsalign-help"></i>
         </label>
       </div>
 
       <!-- Right: missing keyword chips -->
       <div class="rsalign-right">
         <div class="rsalign-kw-header">
-          <p class="rsalign-col-title">添加缺失技能关键词&nbsp;<span class="rsalign-kw-count" id="rsalign-kw-count">(0/0)</span></p>
+          <p class="rsalign-col-title">2. 添加缺失技能关键词&nbsp;<span class="rsalign-kw-count" id="rsalign-kw-count">(0/0)</span></p>
           <button class="rsalign-select-all" id="rsalign-select-all">全选</button>
         </div>
         <div class="rsalign-kw-chips" id="rsalign-kw-chips"></div>
         <div class="rsalign-kw-add-row">
           <input type="text" class="rsalign-kw-input" id="rsalign-kw-input" placeholder="添加关键词">
-          <i class="fa-regular fa-circle-question rsalign-kw-help-icon"></i>
         </div>
       </div>
 
@@ -600,6 +670,18 @@
       <button class="btn-primary btn-full" id="btn-resume-download">
         <i class="fa-solid fa-file-arrow-down"></i> 下载简历
       </button>
+      <div class="ai-feedback-row" id="resume-feedback-row">
+        <span class="ai-feedback-label">对这份简历满意吗？</span>
+        <button class="btn-ai-like" id="btn-resume-like" title="满意"><i class="fa-regular fa-thumbs-up"></i></button>
+        <button class="btn-ai-dislike" id="btn-resume-dislike" title="不满意"><i class="fa-regular fa-thumbs-down"></i></button>
+      </div>
+      <div class="dislike-reasons hidden" id="resume-dislike-reasons">
+        <button class="dislike-reason-tag" data-reason="改写不准确">改写不准确</button>
+        <button class="dislike-reason-tag" data-reason="夸大了经历">夸大了经历</button>
+        <button class="dislike-reason-tag" data-reason="关键技能未突出">关键技能未突出</button>
+        <button class="dislike-reason-tag" data-reason="排版格式问题">排版格式问题</button>
+        <button class="btn-dislike-confirm hidden" id="btn-resume-dislike-confirm">提交</button>
+      </div>
     </div>
 
   </div>

@@ -198,7 +198,7 @@ ${JSON.stringify(profile?.basic || {}, null, 2)}`;
 // ─────────────────────────────────────────────
 async function rewriteResume({ profile, jdParsed, sections, workExpMode, extraKeywords }) {
   const activeSections = sections && sections.length ? sections : ['summary', 'skills', 'work_experience', 'projects'];
-  const mode = workExpMode || 'full';
+  const mode = workExpMode || 'quick';
   const keywords = extraKeywords || [];
 
   // Build prompt profile: for quick mode, keep only first 2 experiences

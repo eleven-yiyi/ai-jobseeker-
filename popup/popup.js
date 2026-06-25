@@ -826,6 +826,8 @@ async function initResumeAlign() {
 
   // Reset keyword selection
   resumeOptions.keywords = [];
+  resumeOptions.sections = ['summary', 'skills', 'work_experience', 'projects'];
+  resumeOptions.workExpMode = 'quick';
 
   const missing = (cached.matches || []).filter(m => m.status === 'missing');
   const chipsEl = document.getElementById('rsalign-kw-chips');
@@ -878,19 +880,11 @@ async function initResumeAlign() {
   // Select all button
   const selectAllBtn = document.getElementById('rsalign-select-all');
   selectAllBtn.onclick = () => {
-    const chips = document.querySelectorAll('.rsalign-kw-chip');
-    const allSelected = [...chips].every(c => c.classList.contains('selected'));
-    chips.forEach(chip => {
-      if (allSelected) {
-        chip.classList.remove('selected');
-      } else {
-        chip.classList.add('selected');
-      }
-    });
-    resumeOptions.keywords = allSelected
-      ? []
-      : missing.map(m => m.skill);
-    updateKwCount(missing.length);
+    const chips = [...document.querySelectorAll('.rsalign-kw-chip')];
+    const allSelected = chips.every(c => c.classList.contains('selected'));
+    chips.forEach(chip => chip.classList.toggle('selected', !allSelected));
+    resumeOptions.keywords = allSelected ? [] : chips.map(c => c.dataset.keyword);
+    updateKwCount(chips.length);
   };
 
   // Custom keyword input: press Enter to add chip

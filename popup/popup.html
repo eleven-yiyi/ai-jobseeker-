@@ -388,7 +388,7 @@
     <div class="rs-step-bar">
       <div class="rs-step rs-active" id="rss-1"><div class="rs-circle">1</div><span class="rs-lbl">查看差异</span></div>
       <div class="rs-line"></div>
-      <div class="rs-step" id="rss-2"><div class="rs-circle">2</div><span class="rs-lbl">AI 优化</span></div>
+      <div class="rs-step" id="rss-2"><div class="rs-circle">2</div><span class="rs-lbl">对齐简历</span></div>
       <div class="rs-line"></div>
       <div class="rs-step" id="rss-3"><div class="rs-circle">3</div><span class="rs-lbl">预览简历</span></div>
     </div>
@@ -410,7 +410,106 @@
 
 
   <!-- ══════════════════════════════════════
-       SCREEN: Resume Step 2 — AI 优化中
+       SCREEN: Resume Step 2 — 对齐简历
+  ══════════════════════════════════════ -->
+  <div id="screen-resume-align" class="screen hidden">
+
+    <header class="header header-slim">
+      <button class="btn-back" id="btn-resume-align-back">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <span class="logo logo-sm"><span class="logo-mark"></span>定制简历</span>
+      <div style="width:32px"></div>
+    </header>
+
+    <div class="rs-step-bar">
+      <div class="rs-step rs-active rs-done"><div class="rs-circle"><i class="fa-solid fa-check"></i></div><span class="rs-lbl">查看差异</span></div>
+      <div class="rs-line rs-line-done"></div>
+      <div class="rs-step rs-active"><div class="rs-circle">2</div><span class="rs-lbl">对齐简历</span></div>
+      <div class="rs-line"></div>
+      <div class="rs-step"><div class="rs-circle">3</div><span class="rs-lbl">预览简历</span></div>
+    </div>
+
+    <main class="content rsalign-body">
+
+      <!-- Left: sections to enhance -->
+      <div class="rsalign-left">
+        <p class="rsalign-col-title">选择要增强的章节</p>
+
+        <label class="rsalign-section-row">
+          <input type="checkbox" class="rsalign-check" value="summary" checked>
+          <span class="rsalign-check-box"></span>
+          <span class="rsalign-section-label">概括</span>
+          <i class="fa-regular fa-circle-question rsalign-help"></i>
+        </label>
+
+        <label class="rsalign-section-row">
+          <input type="checkbox" class="rsalign-check" value="skills" checked>
+          <span class="rsalign-check-box"></span>
+          <span class="rsalign-section-label">技能</span>
+          <i class="fa-regular fa-circle-question rsalign-help"></i>
+        </label>
+
+        <label class="rsalign-section-row">
+          <input type="checkbox" class="rsalign-check" value="work_experience" checked id="rsalign-check-work">
+          <span class="rsalign-check-box"></span>
+          <span class="rsalign-section-label">工作经验</span>
+          <i class="fa-regular fa-circle-question rsalign-help"></i>
+        </label>
+
+        <div class="rsalign-sub" id="rsalign-work-sub">
+          <label class="rsalign-radio-row">
+            <input type="radio" name="work_exp_mode" value="quick" checked>
+            <span class="rsalign-radio-dot"></span>
+            <div class="rsalign-radio-text">
+              <span class="rsalign-radio-title">快速编辑（前 2 段经历）</span>
+              <span class="rsalign-radio-desc">处理速度更快</span>
+            </div>
+          </label>
+          <label class="rsalign-radio-row">
+            <input type="radio" name="work_exp_mode" value="full">
+            <span class="rsalign-radio-dot"></span>
+            <div class="rsalign-radio-text">
+              <span class="rsalign-radio-title">完整编辑（全部经历）</span>
+              <span class="rsalign-radio-desc">处理时间较长</span>
+            </div>
+          </label>
+        </div>
+
+        <label class="rsalign-section-row">
+          <input type="checkbox" class="rsalign-check" value="projects" checked>
+          <span class="rsalign-check-box"></span>
+          <span class="rsalign-section-label">项目</span>
+          <i class="fa-regular fa-circle-question rsalign-help"></i>
+        </label>
+      </div>
+
+      <!-- Right: missing keyword chips -->
+      <div class="rsalign-right">
+        <div class="rsalign-kw-header">
+          <p class="rsalign-col-title">添加缺失技能关键词&nbsp;<span class="rsalign-kw-count" id="rsalign-kw-count">(0/0)</span></p>
+          <button class="rsalign-select-all" id="rsalign-select-all">全选</button>
+        </div>
+        <div class="rsalign-kw-chips" id="rsalign-kw-chips"></div>
+        <div class="rsalign-kw-add-row">
+          <input type="text" class="rsalign-kw-input" id="rsalign-kw-input" placeholder="添加关键词">
+          <i class="fa-regular fa-circle-question rsalign-kw-help-icon"></i>
+        </div>
+      </div>
+
+    </main>
+
+    <div class="rs-action-bar">
+      <button class="btn-secondary btn-full" id="btn-resume-align-next">
+        生成定制简历 <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Resume Step 3 — AI 优化中
   ══════════════════════════════════════ -->
   <div id="screen-resume-loading" class="screen hidden">
 
@@ -425,7 +524,7 @@
     <div class="rs-step-bar">
       <div class="rs-step rs-active rs-done"><div class="rs-circle"><i class="fa-solid fa-check"></i></div><span class="rs-lbl">查看差异</span></div>
       <div class="rs-line rs-line-done"></div>
-      <div class="rs-step rs-active"><div class="rs-circle">2</div><span class="rs-lbl">AI 优化</span></div>
+      <div class="rs-step rs-active"><div class="rs-circle">2</div><span class="rs-lbl">对齐简历</span></div>
       <div class="rs-line"></div>
       <div class="rs-step"><div class="rs-circle">3</div><span class="rs-lbl">预览简历</span></div>
     </div>
@@ -459,7 +558,7 @@
     <div class="rs-step-bar">
       <div class="rs-step rs-active rs-done"><div class="rs-circle"><i class="fa-solid fa-check"></i></div><span class="rs-lbl">查看差异</span></div>
       <div class="rs-line rs-line-done"></div>
-      <div class="rs-step rs-active rs-done"><div class="rs-circle"><i class="fa-solid fa-check"></i></div><span class="rs-lbl">AI 优化</span></div>
+      <div class="rs-step rs-active rs-done"><div class="rs-circle"><i class="fa-solid fa-check"></i></div><span class="rs-lbl">对齐简历</span></div>
       <div class="rs-line rs-line-done"></div>
       <div class="rs-step rs-active"><div class="rs-circle">3</div><span class="rs-lbl">预览简历</span></div>
     </div>

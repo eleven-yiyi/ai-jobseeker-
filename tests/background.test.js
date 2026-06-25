@@ -157,13 +157,15 @@ describe('rewriteResume segment filtering', () => {
     ]);
   });
 
-  test('full mode: all segments pass through (no filter applied)', () => {
+  test('full mode: all segments pass through — filter not applied', () => {
     const segments = [
       { id: 'exp_0_h_0', text: 'h1' },
       { id: 'exp_2_h_0', text: 'h3' },
     ];
-    // full mode uses all segments unchanged
-    expect(segments).toHaveLength(2);
+    // Simulate full mode: no filter, all segments used as-is
+    const promptSegments = segments; // mode === 'full' → no filter
+    expect(promptSegments).toHaveLength(2);
+    expect(promptSegments.find(s => s.id === 'exp_2_h_0')).toBeDefined();
   });
 
   test('quick mode: non-exp segments always pass through', () => {

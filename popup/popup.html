@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>招聘助手</title>
+  <link rel="stylesheet" href="../lib/fontawesome/css/all.min.css">
+  <script src="../lib/pdf.min.js"></script>
+  <script src="../lib/html2pdf.bundle.min.js"></script>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Settings — 设置 / 个人档案
+  ══════════════════════════════════════ -->
+  <div id="screen-settings" class="screen hidden">
+
+    <header class="header">
+      <button class="btn-back" id="btn-settings-back">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <span class="header-spacer"></span>
+      <div style="width:32px"></div>
+    </header>
+
+    <main class="content">
+
+      <!-- 档案摘要 -->
+      <div class="card-dark profile-summary">
+        <div class="profile-avatar">
+          <i class="fa-regular fa-user"></i>
+        </div>
+        <div class="profile-info">
+          <p class="profile-name"  id="s-name">—</p>
+          <p class="profile-meta"  id="s-meta">—</p>
+        </div>
+      </div>
+
+      <!-- 简历操作 -->
+      <div class="card settings-block">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <span class="settings-label">我的简历</span>
+            <span class="settings-value" id="s-resume-hint">已上传</span>
+          </div>
+          <button class="btn-edit" id="btn-reupload-settings">重新上传</button>
+        </div>
+      </div>
+
+      <!-- 今日用量 -->
+      <div class="card settings-block">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <span class="settings-label">今日分析次数</span>
+            <span class="settings-value"><span id="s-usage">0</span> / 30</span>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Onboarding — 上传简历
+  ══════════════════════════════════════ -->
+  <div id="screen-onboarding" class="screen">
+
+    <main class="content">
+      <div class="onboarding-hero">
+        <p class="hero-eyebrow">开始使用</p>
+        <h1 class="hero-title">上传简历<br>AI 自动建档</h1>
+        <p class="hero-sub">支持 BOSS直聘 / 智联 / 猎聘 / 拉勾</p>
+      </div>
+
+      <label class="upload-zone" id="upload-zone" for="input-resume">
+        <i class="fa-solid fa-file-arrow-up upload-icon"></i>
+        <span class="upload-label">点击上传 PDF 简历</span>
+        <span class="upload-hint">仅支持 .pdf 格式</span>
+        <input type="file" id="input-resume" accept=".pdf" hidden>
+      </label>
+
+      <p class="privacy-note">
+        <i class="fa-solid fa-shield-halved"></i>
+        简历仅用于 AI 解析，不上传至任何服务器
+      </p>
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Parsing — 简历解析中
+  ══════════════════════════════════════ -->
+  <div id="screen-parsing" class="screen hidden">
+
+    <main class="content content-center">
+      <div class="loading-wrap">
+        <span class="loading-star">✦</span>
+        <p class="loading-title">正在解析简历</p>
+        <p class="loading-sub">约 10-20 秒</p>
+      </div>
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Confirm — 确认解析结果
+  ══════════════════════════════════════ -->
+  <div id="screen-confirm" class="screen hidden">
+
+    <main class="content">
+      <p class="section-eyebrow">请确认以下信息</p>
+      <h2 class="section-title">AI 已读取你的简历</h2>
+
+      <!-- 基本信息 -->
+      <div class="card confirm-block">
+        <div class="confirm-block-header">
+          <span class="confirm-block-label">基本信息</span>
+          <button class="btn-edit" data-target="basic">编辑</button>
+        </div>
+        <div class="confirm-fields" id="confirm-basic">
+          <div class="confirm-row">
+            <span class="confirm-key">目标岗位</span>
+            <span class="confirm-val" id="cf-role">—</span>
+          </div>
+          <div class="confirm-row">
+            <span class="confirm-key">工作年限</span>
+            <span class="confirm-val" id="cf-years">—</span>
+          </div>
+          <div class="confirm-row">
+            <span class="confirm-key">期望薪资</span>
+            <span class="confirm-val" id="cf-salary">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 最近工作经历 -->
+      <div class="card confirm-block">
+        <div class="confirm-block-header">
+          <span class="confirm-block-label">最近经历</span>
+          <button class="btn-edit" data-target="exp">编辑</button>
+        </div>
+        <div id="confirm-exp">
+          <!-- JS 动态生成 -->
+        </div>
+      </div>
+
+      <button class="btn-secondary btn-full" id="btn-confirm-done">确认，开始使用 →</button>
+      <button class="btn-text" id="btn-reupload">重新上传简历</button>
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Home — 检测到职位，可分析
+  ══════════════════════════════════════ -->
+  <div id="screen-home" class="screen hidden">
+
+    <header class="header header-actions-only">
+      <span class="header-spacer"></span>
+      <button class="header-pill" id="btn-goto-profile">我的档案</button>
+    </header>
+
+    <main class="content content-home">
+
+      <div class="card-dark job-preview">
+        <div class="job-preview-info">
+          <span class="tag-detected">当前职位</span>
+          <p class="job-company" id="home-company">—</p>
+          <p class="job-title" id="home-title">—</p>
+          <button class="btn-refresh-inline" id="btn-refresh-home">
+            <i class="fa-solid fa-rotate"></i> 换了职位？重新检测
+          </button>
+        </div>
+        <button class="btn-analyze" id="btn-analyze">
+          <i class="fa-regular fa-file-lines"></i> 分析当前职位
+        </button>
+      </div>
+
+      <section class="dashboard-grid">
+        <div class="card metric-card">
+          <div class="metric-header">
+            <span class="metric-label">今日投递进度</span>
+            <span class="metric-value"><span id="usage-used">0</span> / 30 次</span>
+          </div>
+          <div class="mini-progress"><div class="mini-progress-fill" id="home-usage-progress"></div></div>
+          <div class="metric-subrow">
+            <span>已投递 <b id="home-applied-count">0</b></span>
+            <span>待跟进 <b id="home-pending-count">1</b></span>
+          </div>
+        </div>
+
+        <div class="card resume-status-card">
+          <div>
+            <span class="metric-label">简历状态</span>
+            <p class="resume-status-text" id="home-resume-status">已上传</p>
+          </div>
+          <button class="btn-edit" id="btn-home-resume-entry">查看</button>
+        </div>
+
+        <div class="card recent-card">
+          <div class="section-row">
+            <span class="metric-label">最近分析岗位</span>
+          </div>
+          <div class="recent-list" id="home-recent-list">
+            <p class="recent-empty">分析职位后会显示最近记录</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="card next-step-card">
+        <span class="metric-label">建议下一步</span>
+        <p>先分析当前职位，确认关键差距后再生成打招呼语或定制简历。</p>
+      </div>
+
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: No Job — 未在招聘平台
+  ══════════════════════════════════════ -->
+  <div id="screen-no-job" class="screen hidden">
+
+    <header class="header header-actions-only">
+      <span class="header-spacer"></span>
+      <button class="header-pill" id="btn-goto-profile2">我的档案</button>
+    </header>
+
+    <main class="content content-center">
+      <div class="empty-state">
+        <div class="empty-icon">
+          <i class="fa-regular fa-file-lines"></i>
+        </div>
+        <p class="empty-title">前往职位详情页</p>
+        <p class="empty-sub">在 BOSS直聘、智联招聘、猎聘<br>或拉勾打开一个职位即可分析</p>
+        <button class="btn-refresh-detect" id="btn-refresh-no-job">
+          <i class="fa-solid fa-rotate"></i> 重新检测
+        </button>
+      </div>
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Analyzing — 分析中
+  ══════════════════════════════════════ -->
+  <div id="screen-analyzing" class="screen hidden">
+
+    <main class="content content-center">
+      <div class="loading-wrap">
+        <span class="loading-star">✦</span>
+        <p class="loading-title">AI 分析中</p>
+        <p class="loading-sub">约 10-20 秒</p>
+      </div>
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Results — 分析结果
+  ══════════════════════════════════════ -->
+  <div id="screen-results" class="screen hidden">
+
+    <header class="header header-slim">
+      <button class="btn-back" id="btn-back">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <span class="header-spacer"></span>
+      <div style="width:32px"></div>
+    </header>
+
+    <main class="content">
+
+      <!-- 评分卡 -->
+      <div class="card-dark result-header-card">
+        <div class="result-job-info">
+          <p class="job-company" id="result-company">—</p>
+          <p class="job-title" id="result-title">—</p>
+          <p class="result-time" id="result-time">刚刚分析</p>
+        </div>
+        <div class="score-panel">
+          <span class="score-label">匹配度</span>
+          <strong class="score-value" id="result-score">—</strong>
+          <div class="score-track"><div class="score-fill" id="result-score-fill"></div></div>
+          <span class="score-note" id="result-score-note">等待分析</span>
+        </div>
+      </div>
+
+      <div class="card insight-card">
+        <span class="metric-label">分析建议</span>
+        <p id="result-insight">根据匹配结果查看关键差距，并选择下一步行动。</p>
+      </div>
+
+      <!-- 技能匹配 -->
+      <div class="card skills-card">
+        <p class="card-label">关键差距</p>
+        <div class="skills-list" id="skills-list">
+          <!-- JS 动态生成 -->
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="action-row">
+        <button class="btn-secondary btn-half" id="btn-greeting">
+          <i class="fa-regular fa-comment-dots"></i> 打招呼语
+        </button>
+        <button class="btn-primary btn-half" id="btn-resume">
+          <i class="fa-regular fa-file-lines"></i> 定制简历
+        </button>
+      </div>
+
+      <!-- 打招呼语面板（inline，点击按钮后展开） -->
+      <div id="greetings-panel" class="card greetings-panel hidden">
+        <p class="card-label">打招呼语</p>
+
+        <div class="greeting-item" id="greeting-0">
+          <span class="greeting-style-tag">专业简洁</span>
+          <p class="greeting-text" id="greeting-text-0">—</p>
+          <button class="btn-copy" data-index="0">复制</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="greeting-item" id="greeting-1">
+          <span class="greeting-style-tag">热情积极</span>
+          <p class="greeting-text" id="greeting-text-1">—</p>
+          <button class="btn-copy" data-index="1">复制</button>
+        </div>
+      </div>
+
+      <!-- 打招呼语加载状态 -->
+      <div id="greetings-loading" class="card greetings-panel hidden">
+        <div class="loading-inline">
+          <span class="loading-star loading-star-sm">✦</span>
+          <span>生成打招呼语中...</span>
+        </div>
+      </div>
+
+      <!-- 投递反馈 -->
+      <div class="feedback-row" id="feedback-row">
+        <span class="feedback-label">投出去了吗？</span>
+        <button class="btn-chip" id="btn-applied">已投递</button>
+        <button class="btn-chip" id="btn-not-applied">未投递</button>
+      </div>
+
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Limit — 今日次数已用完
+  ══════════════════════════════════════ -->
+  <div id="screen-limit" class="screen hidden">
+
+    <main class="content content-center">
+      <div class="empty-state">
+        <div class="empty-icon empty-icon-primary">✦</div>
+        <p class="empty-title">今日次数已用完</p>
+        <p class="empty-sub">明天再来继续分析吧</p>
+      </div>
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Resume Step 1 — 查看差异
+  ══════════════════════════════════════ -->
+  <div id="screen-resume-diff" class="screen hidden">
+
+    <header class="header header-slim">
+      <button class="btn-back" id="btn-resume-diff-back">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <span class="logo logo-sm"><span class="logo-mark"></span>定制简历</span>
+      <div style="width:32px"></div>
+    </header>
+
+    <div class="rs-step-bar">
+      <div class="rs-step rs-active" id="rss-1"><div class="rs-circle">1</div><span class="rs-lbl">查看差异</span></div>
+      <div class="rs-line"></div>
+      <div class="rs-step" id="rss-2"><div class="rs-circle">2</div><span class="rs-lbl">AI 优化</span></div>
+      <div class="rs-line"></div>
+      <div class="rs-step" id="rss-3"><div class="rs-circle">3</div><span class="rs-lbl">预览简历</span></div>
+    </div>
+
+    <main class="content">
+      <p class="rsdiff-title">这份简历将针对以下要求优化</p>
+      <p class="rsdiff-job" id="rsdiff-job">—</p>
+      <div class="rsdiff-tags" id="rsdiff-tags"></div>
+      <p class="rsdiff-stat" id="rsdiff-stat"></p>
+    </main>
+
+    <div class="rs-action-bar">
+      <button class="btn-secondary btn-full" id="btn-resume-generate">
+        生成定制简历 <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Resume Step 2 — AI 优化中
+  ══════════════════════════════════════ -->
+  <div id="screen-resume-loading" class="screen hidden">
+
+    <header class="header header-slim">
+      <button class="btn-back" id="btn-resume-loading-back">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <span class="logo logo-sm"><span class="logo-mark"></span>定制简历</span>
+      <div style="width:32px"></div>
+    </header>
+
+    <div class="rs-step-bar">
+      <div class="rs-step rs-active rs-done"><div class="rs-circle"><i class="fa-solid fa-check"></i></div><span class="rs-lbl">查看差异</span></div>
+      <div class="rs-line rs-line-done"></div>
+      <div class="rs-step rs-active"><div class="rs-circle">2</div><span class="rs-lbl">AI 优化</span></div>
+      <div class="rs-line"></div>
+      <div class="rs-step"><div class="rs-circle">3</div><span class="rs-lbl">预览简历</span></div>
+    </div>
+
+    <main class="content content-center">
+      <div class="rload-wrap">
+        <p class="rload-title">正在定制你的简历……</p>
+        <div class="rs-progress-track"><div class="rs-progress-fill"></div></div>
+        <p class="rload-sub"><i class="fa-solid fa-circle-info"></i> 约 15-25 秒，请稍等</p>
+      </div>
+    </main>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Resume Step 3 — 预览简历
+  ══════════════════════════════════════ -->
+  <div id="screen-resume-view" class="screen hidden">
+
+    <header class="header header-slim">
+      <button class="btn-back" id="btn-resume-view-back">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <span class="logo logo-sm"><span class="logo-mark"></span>定制简历</span>
+      <button class="header-pill" id="btn-resume-edit">
+        <i class="fa-solid fa-pen"></i> 编辑
+      </button>
+    </header>
+
+    <div class="rs-step-bar">
+      <div class="rs-step rs-active rs-done"><div class="rs-circle"><i class="fa-solid fa-check"></i></div><span class="rs-lbl">查看差异</span></div>
+      <div class="rs-line rs-line-done"></div>
+      <div class="rs-step rs-active rs-done"><div class="rs-circle"><i class="fa-solid fa-check"></i></div><span class="rs-lbl">AI 优化</span></div>
+      <div class="rs-line rs-line-done"></div>
+      <div class="rs-step rs-active"><div class="rs-circle">3</div><span class="rs-lbl">预览简历</span></div>
+    </div>
+
+    <main class="content rs-resume-scroll">
+      <div class="rs-resume-page" id="rs-resume-page">
+
+        <div class="rs-r-header">
+          <h1 class="rs-r-name" id="rs-r-name" contenteditable="false"></h1>
+          <p class="rs-r-tagline" id="rs-r-tagline" contenteditable="false"></p>
+          <div class="rs-r-contact" id="rs-r-contact" contenteditable="false"></div>
+        </div>
+
+        <div class="rs-r-divider"></div>
+
+        <section class="rs-r-section">
+          <h2 class="rs-r-section-title">个人优势</h2>
+          <ul class="rs-r-list" id="rs-r-strengths"></ul>
+        </section>
+
+        <div class="rs-r-divider"></div>
+
+        <section class="rs-r-section">
+          <h2 class="rs-r-section-title">工作经历</h2>
+          <div id="rs-r-experiences"></div>
+        </section>
+
+        <div class="rs-r-divider"></div>
+
+        <section class="rs-r-section">
+          <h2 class="rs-r-section-title">教育背景</h2>
+          <div id="rs-r-education"></div>
+        </section>
+
+      </div>
+    </main>
+
+    <div class="rs-action-bar">
+      <button class="btn-primary btn-full" id="btn-resume-download">
+        <i class="fa-solid fa-file-arrow-down"></i> 下载简历
+      </button>
+    </div>
+
+  </div>
+
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>定制简历 · 招聘助手</title>
+  <link rel="stylesheet" href="../lib/fontawesome/css/all.min.css">
+  <script src="../lib/html2pdf.bundle.min.js"></script>
+  <link rel="stylesheet" href="resume.css">
+</head>
+<body>
+
+  <!-- ── 顶部工具栏 ── -->
+  <header class="toolbar" id="toolbar">
+    <div class="toolbar-left">
+      <img src="logo.png" class="toolbar-logo" alt="招聘助手">
+    </div>
+    <div class="toolbar-center" id="toolbar-subtitle"></div>
+    <div class="toolbar-right">
+      <button class="btn-edit-toggle hidden" id="btn-edit-toggle">
+        <i class="fa-solid fa-pen"></i> 编辑
+      </button>
+    </div>
+  </header>
+
+  <!-- ── 步骤指示条 ── -->
+  <div class="step-indicator">
+    <div class="step-item" id="step-1">
+      <div class="step-circle"><span>1</span></div>
+      <span class="step-label">查看差异</span>
+    </div>
+    <div class="step-line" id="step-line-1"></div>
+    <div class="step-item" id="step-2">
+      <div class="step-circle"><span>2</span></div>
+      <span class="step-label">AI 优化中</span>
+    </div>
+    <div class="step-line" id="step-line-2"></div>
+    <div class="step-item" id="step-3">
+      <div class="step-circle"><span>3</span></div>
+      <span class="step-label">预览简历</span>
+    </div>
+  </div>
+
+
+  <!-- ── Step 1: 查看差异 ── -->
+  <div id="state-diff" class="step-content hidden">
+    <div class="diff-wrap">
+      <p class="diff-title">这份简历将针对以下要求优化</p>
+      <p class="diff-job-name" id="diff-job-name">—</p>
+      <div class="diff-grid" id="diff-grid"></div>
+      <p class="diff-summary" id="diff-summary"></p>
+    </div>
+  </div>
+
+
+  <!-- ── Step 2: AI 优化中 ── -->
+  <div id="state-loading" class="step-content hidden">
+    <div class="loading-wrap-v2">
+      <p class="loading-title-v2">正在定制你的简历……</p>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill"></div>
+      </div>
+      <p class="loading-sub-v2">
+        <i class="fa-solid fa-circle-info"></i>
+        约 15-25 秒，请稍等
+      </p>
+    </div>
+  </div>
+
+
+  <!-- ── 错误状态 ── -->
+  <div id="state-error" class="step-content hidden">
+    <div class="loading-wrap-v2">
+      <i class="fa-solid fa-circle-xmark error-icon"></i>
+      <p class="loading-title-v2">生成失败</p>
+      <p class="loading-sub-v2" id="error-msg">请关闭此页面后重试</p>
+    </div>
+  </div>
+
+
+  <!-- ── Step 3: 简历预览 ── -->
+  <div id="state-resume" class="resume-wrap hidden">
+    <div class="resume-page" id="resume-page">
+
+      <section class="r-header">
+        <div class="r-header-main">
+          <h1 class="r-name" id="r-name" contenteditable="false"></h1>
+          <p class="r-tagline" id="r-tagline" contenteditable="false"></p>
+        </div>
+        <div class="r-header-contact" id="r-contact" contenteditable="false"></div>
+      </section>
+
+      <div class="r-divider"></div>
+
+      <section class="r-section" id="section-strengths">
+        <h2 class="r-section-title">个人优势</h2>
+        <ul class="r-bullet-list" id="r-strengths"></ul>
+      </section>
+
+      <div class="r-divider"></div>
+
+      <section class="r-section" id="section-experience">
+        <h2 class="r-section-title">工作经历</h2>
+        <div id="r-experiences"></div>
+      </section>
+
+      <div class="r-divider"></div>
+
+      <section class="r-section" id="section-education">
+        <h2 class="r-section-title">教育背景</h2>
+        <div id="r-education"></div>
+      </section>
+
+    </div>
+  </div>
+
+
+  <!-- ── 底部 Action Bar ── -->
+  <footer class="bottom-bar">
+    <button class="btn-bottom-back" id="btn-bottom-back">
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+    <button class="btn-bottom-action" id="btn-bottom-action">
+      生成定制简历
+    </button>
+  </footer>
+
+  <script src="resume.js"></script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "招聘助手",
+  "version": "1.0.0",
+  "description": "AI 驱动的招聘助手：JD 解析 · 匹配评分 · 定制简历",
+  "icons": {
+    "16":  "assets/icons/icon-16.png",
+    "48":  "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16":  "assets/icons/icon-16.png",
+      "48":  "assets/icons/icon-48.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "popup/popup.html"
+  },
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.zhipin.com/*",
+        "https://www.zhaopin.com/*",
+        "https://www.liepin.com/*",
+        "https://www.lagou.com/*"
+      ],
+      "js": ["content/content.js"],
+      "css": ["content/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "sidePanel",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://api.deepseek.com/*",
+    "https://www.zhipin.com/*",
+    "https://www.zhaopin.com/*",
+    "https://www.liepin.com/*",
+    "https://www.lagou.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["resume/resume.html", "lib/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

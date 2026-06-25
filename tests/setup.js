@@ -1,3 +1,7 @@
+// Mock Service Worker globals not available in jsdom
+global.importScripts = () => {};
+global.DEEPSEEK_API_KEY = 'test-api-key';
+
 // Global Chrome Extension API mock for Jest
 global.chrome = {
   storage: {
@@ -33,6 +37,9 @@ global.chrome = {
     query: jest.fn(),
     sendMessage: jest.fn(),
     create: jest.fn(),
+  },
+  sidePanel: {
+    setPanelBehavior: jest.fn().mockResolvedValue(undefined),
   },
 };
 

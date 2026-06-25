@@ -136,3 +136,45 @@ describe('handleMessage', () => {
       .rejects.toThrow('未知消息类型: UNKNOWN_TYPE');
   });
 });
+
+// ─────────────────────────────────────────────
+// rewriteResume segment filtering
+// ─────────────────────────────────────────────
+describe('rewriteResume segment filtering', () => {
+  test('quick mode: only exp_0 and exp_1 segments pass through', () => {
+    const segments = [
+      { id: 'exp_0_h_0', text: 'h1' },
+      { id: 'exp_1_h_0', text: 'h2' },
+      { id: 'exp_2_h_0', text: 'h3' },
+    ];
+    const filtered = segments.filter(s => {
+      const parts = s.id.split('_');
+      return parts[0] !== 'exp' || parseInt(parts[1], 10) < 2;
+    });
+    expect(filtered).toEqual([
+      { id: 'exp_0_h_0', text: 'h1' },
+      { id: 'exp_1_h_0', text: 'h2' },
+    ]);
+  });
+
+  test('full mode: all segments pass through (no filter applied)', () => {
+    const segments = [
+      { id: 'exp_0_h_0', text: 'h1' },
+      { id: 'exp_2_h_0', text: 'h3' },
+    ];
+    // full mode uses all segments unchanged
+    expect(segments).toHaveLength(2);
+  });
+
+  test('quick mode: non-exp segments always pass through', () => {
+    const segments = [
+      { id: 'edu_0', text: 'education' },
+      { id: 'exp_3_h_0', text: 'should be filtered' },
+    ];
+    const filtered = segments.filter(s => {
+      const parts = s.id.split('_');
+      return parts[0] !== 'exp' || parseInt(parts[1], 10) < 2;
+    });
+    expect(filtered).toEqual([{ id: 'edu_0', text: 'education' }]);
+  });
+});

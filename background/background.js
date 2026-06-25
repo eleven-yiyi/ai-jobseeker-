@@ -196,13 +196,33 @@ ${JSON.stringify(profile?.basic || {}, null, 2)}`;
 // ─────────────────────────────────────────────
 // Step 4 · 简历改写
 // ─────────────────────────────────────────────
-async function rewriteResume({ profile, jdParsed }) {
+async function rewriteResume({ profile, jdParsed, sections, workExpMode, extraKeywords }) {
+  const activeSections = sections && sections.length ? sections : ['summary', 'skills', 'work_experience', 'projects'];
+  const mode = workExpMode || 'full';
+  const keywords = extraKeywords || [];
+
+  // Build prompt profile: for quick mode, keep only first 2 experiences
+  const promptSegments = mode === 'quick'
+    ? (profile.segments || []).filter(s => {
+        const parts = s.id.split('_');
+        return parts[0] !== 'exp' || parseInt(parts[1], 10) < 2;
+      })
+    : (profile.segments || []);
+
   const system = `你是一个简历优化专家。根据职位需求，对候选人简历进行措辞优化，突出与 JD 的匹配点。
 
 严格约束：
 - 只改写已有内容的表达方式，禁止添加候选人档案中不存在的经历、技能或数据
 - 每条改写内容必须标注来源片段 ID（source_id）
 - 如无合适来源，保留原文，source_id 标注为 "original"`;
+
+  const sectionsNote = activeSections.length < 4
+    ? `\n仅改写以下章节：${activeSections.join('、')}`
+    : '';
+
+  const keywordsNote = keywords.length > 0
+    ? `\n在改写中自然融入以下关键词（仅当有简历来源支持时）：${keywords.join('、')}`
+    : '';
 
   const user = `请改写以下简历内容，输出 JSON：
 {
@@ -220,12 +240,13 @@ async function rewriteResume({ profile, jdParsed }) {
     }
   ]
 }
+${sectionsNote}${keywordsNote}
 
 JD must_have 要求：
 ${JSON.stringify(jdParsed.must_have || [], null, 2)}
 
 候选人简历语义片段（带 ID）：
-${JSON.stringify(profile.segments || [], null, 2)}`;
+${JSON.stringify(promptSegments, null, 2)}`;
 
   return callDeepSeek(system, user);
 }

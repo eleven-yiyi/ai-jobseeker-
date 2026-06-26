@@ -1,5 +1,8 @@
 'use strict';
 
+// Firefox does not support chrome.identity (no Google OAuth in extensions)
+const HAS_IDENTITY_API = !!(typeof chrome !== 'undefined' && chrome.identity);
+
 // ─────────────────────────────────────────────
 // State
 // ─────────────────────────────────────────────
@@ -64,6 +67,8 @@ function saveSync(obj) {
 //   → enter your extension's ID → copy the client_id into manifest.json "oauth2"
 // ─────────────────────────────────────────────
 async function signIn() {
+  if (!HAS_IDENTITY_API) throw new Error('当前浏览器不支持 Google 登录');
+
   const token = await new Promise((resolve, reject) => {
     chrome.identity.getAuthToken({ interactive: true }, tok => {
       if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
@@ -82,17 +87,19 @@ async function signIn() {
 }
 
 async function signOut() {
-  try {
-    const token = await new Promise(resolve => {
-      chrome.identity.getAuthToken({ interactive: false }, tok => {
-        resolve(chrome.runtime.lastError ? null : tok);
+  if (HAS_IDENTITY_API) {
+    try {
+      const token = await new Promise(resolve => {
+        chrome.identity.getAuthToken({ interactive: false }, tok => {
+          resolve(chrome.runtime.lastError ? null : tok);
+        });
       });
-    });
-    if (token) {
-      chrome.identity.removeCachedAuthToken({ token }, () => {});
-      fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`).catch(() => {});
-    }
-  } catch {}
+      if (token) {
+        chrome.identity.removeCachedAuthToken({ token }, () => {});
+        fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`).catch(() => {});
+      }
+    } catch {}
+  }
   await chrome.storage.local.remove('user');
 }
 
@@ -210,6 +217,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const { user } = await load('user');
   if (!user) {
+    if (!HAS_IDENTITY_API) {
+      // Firefox: skip Google login, go directly to onboarding / main
+      const { setup_done } = await load('setup_done');
+      if (!setup_done) { showScreen('onboarding'); } else { await initMainFlow(); }
+      return;
+    }
     showScreen('login');
     return;
   }

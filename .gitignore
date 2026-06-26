@@ -3,3 +3,4 @@ background/config.js
 extension_key.pem
 .DS_Store
 **/.DS_Store
+dist/

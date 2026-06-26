@@ -6,7 +6,11 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "ai-jobseeker@eleven-yiyi",
-      "strict_min_version": "109.0"
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": ["none"],
+        "optional": []
+      }
     }
   },
   "icons": {
@@ -29,7 +33,6 @@
     }
   },
   "background": {
-    "service_worker": "background/background.js",
     "scripts": ["background/background.js"]
   },
   "content_scripts": [
@@ -63,9 +66,5 @@
       "resources": ["resume/resume.html", "lib/*"],
       "matches": ["<all_urls>"]
     }
-  ],
-  "data_collection_permissions": {
-    "required": [],
-    "optional": []
-  }
+  ]
 }

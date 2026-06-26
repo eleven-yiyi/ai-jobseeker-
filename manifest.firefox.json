@@ -63,5 +63,9 @@
       "resources": ["resume/resume.html", "lib/*"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "data_collection_permissions": {
+    "required": ["user_activity"],
+    "optional": []
+  }
 }

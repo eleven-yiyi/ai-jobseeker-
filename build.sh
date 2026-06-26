@@ -16,24 +16,35 @@ pack() {
   local tmp
   tmp=$(mktemp -d)
 
-  # Copy everything into temp dir
-  cp -r . "$tmp/"
+  # Copy only the files that should ship, excluding dev/private artifacts
+  rsync -a \
+    --exclude=".git" \
+    --exclude=".claude" \
+    --exclude=".superpowers" \
+    --exclude=".DS_Store" \
+    --exclude="node_modules" \
+    --exclude="dist" \
+    --exclude="tests" \
+    --exclude="docs" \
+    --exclude="background/config.js" \
+    --exclude="extension_key.pem" \
+    --exclude="build.sh" \
+    --exclude="package.json" \
+    --exclude="package-lock.json" \
+    --exclude="CLAUDE.md" \
+    --exclude="prompts.md" \
+    --exclude="logo.png" \
+    --exclude="manifest.edge.json" \
+    --exclude="manifest.firefox.json" \
+    --exclude="*.pdf" \
+    --exclude="*.pem" \
+    --exclude="*.md" \
+    . "$tmp/"
 
-  # Replace manifest with browser-specific one
+  # Override manifest with browser-specific version
   cp "$SCRIPT_DIR/$manifest_src" "$tmp/manifest.json"
 
-  # Remove files that must not ship
-  rm -rf  "$tmp/.git" "$tmp/node_modules" "$tmp/dist" "$tmp/tests" "$tmp/docs"
-  rm -f   "$tmp/.gitignore" "$tmp/.DS_Store" "$tmp/background/.DS_Store"
-  rm -f   "$tmp/background/config.js" "$tmp/extension_key.pem"
-  rm -f   "$tmp/build.sh" "$tmp/package.json" "$tmp/package-lock.json"
-  rm -f   "$tmp/CLAUDE.md" "$tmp/prompts.md" "$tmp/logo.png"
-  rm -f   "$tmp/manifest.edge.json" "$tmp/manifest.firefox.json"
-  # Remove any lingering personal files
-  find "$tmp" -name "*.pdf"    -delete
-  find "$tmp" -name "*.pem"    -delete
-  find "$tmp" -maxdepth 1 -name "*.md" -delete
-
+  rm -f "$SCRIPT_DIR/$out"
   (cd "$tmp" && zip -rq "$SCRIPT_DIR/$out" .)
   rm -rf "$tmp"
   echo "  $out"

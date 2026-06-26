@@ -1,7 +1,11 @@
 'use strict';
 
 // Load API key from config.js (gitignored — never hardcode keys here)
-importScripts('./config.js');
+// importScripts is only available in Service Worker context (Chrome/Edge);
+// Firefox may run this as a background script where it is not defined.
+if (typeof importScripts === 'function') {
+  importScripts('./config.js');
+}
 
 // ─────────────────────────────────────────────
 // Supabase

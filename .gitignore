@@ -4,3 +4,7 @@ extension_key.pem
 .DS_Store
 **/.DS_Store
 dist/
+.claude/settings.local.json
+debug/
+AI测试观察记录.md
+logo 1.png

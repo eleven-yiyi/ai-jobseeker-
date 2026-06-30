@@ -209,6 +209,16 @@
         </div>
       </div>
 
+      <!-- 项目经历 -->
+      <div class="card confirm-block" id="confirm-proj-block">
+        <div class="confirm-block-header">
+          <span class="confirm-block-label">项目经历</span>
+        </div>
+        <div id="confirm-proj">
+          <!-- JS 动态生成 -->
+        </div>
+      </div>
+
       <button class="btn-secondary btn-full" id="btn-confirm-done">确认，开始使用 →</button>
       <button class="btn-text" id="btn-reupload">重新上传简历</button>
     </main>
@@ -683,6 +693,37 @@
         <button class="btn-dislike-confirm hidden" id="btn-resume-dislike-confirm">提交</button>
       </div>
     </div>
+
+  </div>
+
+
+
+  <!-- ══════════════════════════════════════
+       SCREEN: Followup — 投递回音追踪
+  ══════════════════════════════════════ -->
+  <div id="screen-followup" class="screen hidden">
+
+    <main class="content content-center">
+      <div class="empty-state">
+        <div class="empty-icon">
+          <i class="fa-regular fa-bell"></i>
+        </div>
+        <p class="empty-title">有回音了吗？</p>
+        <p class="empty-sub" id="followup-job">—</p>
+        <div class="followup-btns">
+          <button class="btn-secondary btn-full" id="btn-followup-replied">
+            <i class="fa-solid fa-circle-check"></i> 收到回复
+          </button>
+          <button class="btn-primary btn-full" id="btn-followup-read-no-reply">
+            已读不回
+          </button>
+          <button class="btn-primary btn-full" id="btn-followup-no-response">
+            未收到消息
+          </button>
+          <button class="btn-text" id="btn-followup-later">稍后再说</button>
+        </div>
+      </div>
+    </main>
 
   </div>
 

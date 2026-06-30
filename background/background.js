@@ -114,10 +114,25 @@ async function parseResume(rawText) {
       "company": "公司名",
       "role": "职位",
       "period": "起止时间",
-      "highlights": ["亮点1", "亮点2"]
+      "highlights": ["该段工作职责/成果亮点，直接从原文提取，不补充或美化"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "项目名称",
+      "company": "所属公司（与 experiences 中的公司名保持一致）",
+      "role": "担任角色",
+      "period": "起止时间",
+      "highlights": ["项目成果亮点，直接从原文提取，不补充或美化"]
     }
   ]
 }
+
+排列规则：
+- experiences 按开始时间倒序（最近在前）
+- projects 按开始时间倒序，同一公司的项目集中排列
+- 如果简历没有独立的项目经历，projects 输出空数组 []
+- 不得捏造或推断原文不存在的信息
 
 简历原文：
 ${rawText}`;
@@ -184,6 +199,7 @@ async function analyzeMatch(profile, jdParsed) {
   "matches": [
     {
       "skill": "技能名称",
+      "category": "must_have | nice_to_have",
       "status": "match | partial | missing",
       "evidence": "档案中对应的原文依据，missing 时为 null"
     }
@@ -191,6 +207,7 @@ async function analyzeMatch(profile, jdParsed) {
 }
 
 规则：
+- category：该技能来自 must_have 列则为 "must_have"，来自 nice_to_have 列则为 "nice_to_have"
 - match：档案中有明确对应经历或技能
 - partial：档案中有相关但非直接匹配的经历
 - missing：档案中完全没有提及
@@ -198,11 +215,12 @@ async function analyzeMatch(profile, jdParsed) {
 候选人档案：
 ${JSON.stringify(profile, null, 2)}
 
-职位需求（must_have + nice_to_have）：
-${JSON.stringify({
-  must_have:    jdParsed.must_have    || [],
-  nice_to_have: jdParsed.nice_to_have || [],
-}, null, 2)}`;
+职位需求：
+must_have（必须具备）：
+${JSON.stringify(jdParsed.must_have || [], null, 2)}
+
+nice_to_have（加分项）：
+${JSON.stringify(jdParsed.nice_to_have || [], null, 2)}`;
 
   const result = await callDeepSeek(system, user);
   result.score = calcScore(result.matches || []);
@@ -211,9 +229,36 @@ ${JSON.stringify({
 
 function calcScore(matches) {
   if (!matches.length) return 0;
-  const weights = { match: 1, partial: 0.5, missing: 0 };
-  const earned  = matches.reduce((sum, m) => sum + (weights[m.status] ?? 0), 0);
-  return Math.round((earned / matches.length) * 100);
+
+  const mustHave   = matches.filter(m => m.category === 'must_have');
+  const niceToHave = matches.filter(m => m.category === 'nice_to_have');
+
+  // Fallback for old cached data without category field
+  if (!mustHave.length && !niceToHave.length) {
+    const weights = { match: 1, partial: 0.5, missing: 0 };
+    const earned  = matches.reduce((sum, m) => sum + (weights[m.status] ?? 0), 0);
+    return Math.round((earned / matches.length) * 100);
+  }
+
+  const mustW = { match: 15, partial: 6, missing: 0 };
+  const niceW = { match: 5,  partial: 2, missing: 0 };
+  const maxScore = mustHave.length * 15 + niceToHave.length * 5;
+  if (maxScore === 0) return 0;
+
+  const earned = matches.reduce((sum, m) => {
+    const w = m.category === 'nice_to_have' ? niceW : mustW;
+    return sum + (w[m.status] ?? 0);
+  }, 0);
+
+  let score = Math.round((earned / maxScore) * 100);
+
+  // Special boundary rules
+  if (mustHave.length > 0) {
+    if (mustHave.every(m => m.status === 'missing')) score = Math.min(score, 30);
+    if (mustHave.every(m => m.status === 'match'))   score = Math.max(score, 60);
+  }
+
+  return Math.max(0, Math.min(100, score));
 }
 
 // ─────────────────────────────────────────────
@@ -352,6 +397,9 @@ async function handleMessage(msg) {
     case 'PARSE_RESUME':
       return parseResume(msg.payload.rawText);
 
+    case 'PARSE_JD':
+      return parseJd(msg.payload.jdText);
+
     case 'ANALYZE_JD': {
       const { jd, profile, company, title } = msg.payload;
       const jdParsed = await parseJd(jd);
@@ -375,6 +423,19 @@ async function handleMessage(msg) {
       throw new Error(`未知消息类型: ${msg.type}`);
   }
 }
+
+// ─────────────────────────────────────────────
+// Alarm: 5-day application followup
+// ─────────────────────────────────────────────
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (!alarm.name.startsWith('followup_')) return;
+  const hash = alarm.name.slice('followup_'.length);
+  const { pendingFollowups = [] } = await chrome.storage.local.get('pendingFollowups');
+  if (!pendingFollowups.includes(hash)) {
+    pendingFollowups.push(hash);
+    await chrome.storage.local.set({ pendingFollowups });
+  }
+});
 
 if (typeof module !== 'undefined') {
   module.exports = { buildSegments, calcScore, handleMessage };

@@ -24,7 +24,8 @@ const ALL_SCREENS = [
   'login',
   'onboarding', 'parsing', 'confirm',
   'home', 'no-job', 'analyzing', 'results', 'limit', 'settings',
-  'resume-diff', 'resume-align', 'resume-loading', 'resume-view'
+  'resume-diff', 'resume-align', 'resume-loading', 'resume-view',
+  'followup'
 ];
 
 function showScreen(name) {
@@ -433,6 +434,20 @@ function bindStaticListeners() {
     openSettings()
   );
 
+  // ── Followup screen ──
+  document.getElementById('btn-followup-replied').addEventListener('click', () =>
+    handleFollowupFeedback('replied')
+  );
+  document.getElementById('btn-followup-read-no-reply').addEventListener('click', () =>
+    handleFollowupFeedback('read_no_reply')
+  );
+  document.getElementById('btn-followup-no-response').addEventListener('click', () =>
+    handleFollowupFeedback('no_response')
+  );
+  document.getElementById('btn-followup-later').addEventListener('click', () =>
+    handleFollowupFeedback(null)
+  );
+
   initGreetingFeedback();
   initResumeFeedback();
 }
@@ -441,6 +456,12 @@ function bindStaticListeners() {
 // Main flow: detect job, route to screen
 // ─────────────────────────────────────────────
 async function initMainFlow(showDetectFeedback = false) {
+  // Show pending followup reminder before normal routing (skip on manual refresh)
+  if (!showDetectFeedback) {
+    const hasPending = await checkPendingFollowups();
+    if (hasPending) return;
+  }
+
   currentJob     = await getJobFromTab();
   currentCacheKey = currentJob ? makeCacheKey(currentJob.company, currentJob.title) : null;
 
@@ -463,6 +484,56 @@ async function initMainFlow(showDetectFeedback = false) {
   document.getElementById('home-title').textContent   = currentJob.title   || '—';
   await updateUsageDisplay();
   showScreen('home');
+}
+
+// ─────────────────────────────────────────────
+// Followup reminder
+// ─────────────────────────────────────────────
+async function checkPendingFollowups() {
+  const { pendingFollowups = [], applications = [] } = await load('pendingFollowups', 'applications');
+  if (!pendingFollowups.length) return false;
+
+  // Keep only entries that still have feedback: null
+  const valid = pendingFollowups.filter(h =>
+    applications.some(a => a.hash === h && a.feedback === null)
+  );
+  if (valid.length !== pendingFollowups.length) {
+    await save({ pendingFollowups: valid });
+  }
+  if (!valid.length) return false;
+
+  const hash = valid[0];
+  const app  = applications.find(a => a.hash === hash);
+  const label = [app?.company, app?.title].filter(Boolean).join(' · ');
+  document.getElementById('followup-job').textContent  = label || '—';
+  document.getElementById('screen-followup').dataset.hash = hash;
+  showScreen('followup');
+  return true;
+}
+
+async function handleFollowupFeedback(feedbackValue) {
+  const hash = document.getElementById('screen-followup').dataset.hash;
+  if (!hash) { await initMainFlow(); return; }
+
+  const { applications = [], pendingFollowups = [] } = await load('applications', 'pendingFollowups');
+
+  if (feedbackValue !== null) {
+    const app = applications.find(a => a.hash === hash);
+    if (app) app.feedback = feedbackValue;
+    await save({ applications });
+
+    await sendAiFeedback({
+      feature_type:    'application_followup',
+      greeting_index:  null,
+      feedback_type:   feedbackValue,
+      cancelled:       false,
+      dislike_reasons: null,
+      content:         null,
+    });
+  }
+
+  await save({ pendingFollowups: pendingFollowups.filter(h => h !== hash) });
+  await initMainFlow();
 }
 
 async function updateUsageDisplay() {
@@ -597,6 +668,38 @@ function renderConfirmScreen(profile) {
       <span class="edu-period">${edu.period || ''}</span>
     `;
     eduContainer.appendChild(div);
+  });
+
+  // Projects
+  const projContainer = document.getElementById('confirm-proj');
+  const projBlock = document.getElementById('confirm-proj-block');
+  const projs = profile.projects || [];
+  projBlock.style.display = projs.length ? '' : 'none';
+  projContainer.innerHTML = '';
+  projs.forEach(proj => {
+    const div = document.createElement('div');
+    div.className = 'exp-item';
+
+    const header = document.createElement('div');
+    const meta = [proj.company, proj.role, proj.period].filter(Boolean).join(' · ');
+    header.innerHTML = `
+      <span class="exp-company">${proj.name || '—'}</span>
+      <span class="exp-role-period">${meta}</span>
+    `;
+    div.appendChild(header);
+
+    if (proj.highlights?.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'exp-highlights';
+      proj.highlights.forEach(h => {
+        const li = document.createElement('li');
+        li.textContent = h;
+        ul.appendChild(li);
+      });
+      div.appendChild(ul);
+    }
+
+    projContainer.appendChild(div);
   });
 }
 
@@ -1087,18 +1190,29 @@ async function handleFeedback(status) {
   const { cache = {} }        = await load('cache');
   const idx = applications.findIndex(a => a.hash === currentCacheKey);
 
-  const record = {
-    hash:       currentCacheKey,
-    company:    cache[currentCacheKey]?.company,
-    title:      cache[currentCacheKey]?.title,
-    applied_at: Date.now(),
-    feedback:   status,
-  };
-
-  if (idx >= 0) applications[idx] = record;
-  else          applications.push(record);
-
-  await save({ applications });
+  if (status === 'applied') {
+    const record = {
+      hash:       currentCacheKey,
+      company:    cache[currentCacheKey]?.company,
+      title:      cache[currentCacheKey]?.title,
+      applied_at: Date.now(),
+      feedback:   null,
+    };
+    if (idx >= 0) applications[idx] = record;
+    else          applications.push(record);
+    await save({ applications });
+    // Schedule 5-day followup reminder
+    if (chrome.alarms) {
+      chrome.alarms.create(`followup_${currentCacheKey}`, { delayInMinutes: 5 * 24 * 60 });
+    }
+  } else {
+    // not_applied: remove record and cancel scheduled alarm
+    if (idx >= 0) applications.splice(idx, 1);
+    await save({ applications });
+    if (chrome.alarms) {
+      chrome.alarms.clear(`followup_${currentCacheKey}`);
+    }
+  }
 
   await sendAiFeedback({
     feature_type:    'application',
@@ -1114,9 +1228,9 @@ async function restoreFeedbackState() {
   if (!currentCacheKey) return;
   const { applications = [] } = await load('applications');
   const record = applications.find(a => a.hash === currentCacheKey);
-  if (!record) return;
-  document.getElementById('btn-applied').classList.toggle('active',     record.feedback === 'applied');
-  document.getElementById('btn-not-applied').classList.toggle('active', record.feedback === 'not_applied');
+  // Record presence means user clicked 已投递; absence means not applied (removed on cancel)
+  document.getElementById('btn-applied').classList.toggle('active',     !!record);
+  document.getElementById('btn-not-applied').classList.remove('active');
 }
 
 // ─────────────────────────────────────────────
